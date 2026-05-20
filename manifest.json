@@ -6,9 +6,19 @@
   "entrypoint": "index.html",
   "runtime": "static",
   "category": "productivity",
-  "tags": ["calendar", "events", "scheduling", "recurrence", "google", "apple"],
+  "tags": [
+    "calendar",
+    "events",
+    "scheduling",
+    "recurrence",
+    "google",
+    "apple"
+  ],
   "data_access": {
-    "reads": ["family.members", "family.calendar"],
+    "reads": [
+      "family.members",
+      "family.calendar"
+    ],
     "writes": []
   },
   "permissions": {
@@ -16,9 +26,15 @@
     "requires_approval": false
   },
   "storage": "db",
-  "nav": { "label": "Calendar", "icon": "📅" },
-  "widget": { "label": "Calendar", "size": "small" },
+  "nav": {
+    "label": "Calendar"
+  },
+  "widget": {
+    "label": "Calendar",
+    "size": "small"
+  },
   "resource_limits": {
     "max_db_bytes": 104857600
-  }
+  },
+  "icon": "📅"
 }
