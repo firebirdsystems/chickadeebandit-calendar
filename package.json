@@ -1,0 +1,8 @@
+{
+  "name": "chickadee-app-calendar",
+  "version": "1.0.0",
+  "description": "Calendar app for Family Hub",
+  "type": "module",
+  "scripts": { "build": "node build.mjs" },
+  "license": "MIT"
+}

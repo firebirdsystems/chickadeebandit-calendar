@@ -1,0 +1,1070 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Calendar</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:           var(--hub-bg, #f9fafb);
+      --card:         var(--hub-surface, #ffffff);
+      --border:       var(--hub-border, #e5e7eb);
+      --border-mid:   var(--hub-border, #d1d5db);
+      --text:         var(--hub-text, #111827);
+      --muted:        var(--hub-text-muted, #6b7280);
+      --accent:       var(--hub-primary, #111827);
+      --accent-fg:    var(--hub-primary-fg, #ffffff);
+      --accent-hover: var(--hub-primary-hover, #374151);
+      --accent-light: #f3f4f6;
+      --today-bg: #f0fdf4; --today-ring: #16a34a; --other-month: #9ca3af;
+      --radius:       var(--hub-radius, 0.5rem);
+      --shadow:       0 1px 3px rgba(0,0,0,.07);
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg); color: var(--text);
+      min-height: 100vh; font-size: 14px; line-height: 1.5;
+    }
+    .app { max-width: 900px; margin: 0 auto; padding: 12px 16px 40px; }
+
+    /* ── App header ──────────────────────────────────────── */
+    .app-header {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 12px; margin-bottom: 14px; flex-wrap: wrap;
+    }
+    .nav-group { display: flex; align-items: center; gap: 8px; }
+    .cal-title { font-size: 1.25rem; font-weight: 700; min-width: 160px; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 7px 14px; border-radius: 8px; font-size: 0.82rem;
+      font-weight: 600; cursor: pointer; border: none; transition: opacity .15s;
+    }
+    .btn-primary { background: var(--accent); color: white; }
+    .btn-primary:hover { opacity: .88; }
+    .btn-ghost { background: transparent; border: 1.5px solid var(--border); color: var(--muted); }
+    .btn-ghost:hover { border-color: var(--text); color: var(--text); }
+    .btn-icon { background: var(--card); border: 1.5px solid var(--border); color: var(--text); padding: 6px 10px; border-radius: 7px; font-size: 0.9rem; }
+    .btn-icon:hover { background: var(--border); }
+    .btn-sm { padding: 4px 10px; font-size: 0.78rem; }
+    .btn-danger { background: #dc2626; color: white; }
+
+    .view-toggle {
+      display: flex; border: 1.5px solid var(--border); border-radius: 8px; overflow: hidden;
+    }
+    .view-toggle button {
+      padding: 6px 14px; border: none; background: transparent;
+      font-size: 0.82rem; font-weight: 600; cursor: pointer; color: var(--muted);
+    }
+    .view-toggle button.active { background: var(--accent); color: white; }
+
+    /* ── Month grid ──────────────────────────────────────── */
+    .cal-grid {
+      display: grid; grid-template-columns: repeat(7, 1fr);
+      border: 1px solid var(--border); border-radius: var(--radius);
+      overflow: hidden; background: var(--card);
+    }
+    .cal-dow {
+      padding: 6px 4px; text-align: center;
+      font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .05em; color: var(--muted);
+      border-bottom: 1px solid var(--border);
+      background: #f9fafb;
+    }
+    .cal-cell {
+      min-height: 90px; padding: 4px;
+      border-right: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      cursor: pointer; position: relative;
+      transition: background .1s;
+    }
+    .cal-cell:nth-child(7n) { border-right: none; }
+    .cal-cell:hover { background: #f3f4f6; }
+    .cal-cell.other-month { background: #fafafa; }
+    .cal-cell.today { background: var(--today-bg); }
+    .cal-day-num {
+      font-size: 0.78rem; font-weight: 600; color: var(--muted);
+      margin-bottom: 3px; width: 22px; height: 22px;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 50%;
+    }
+    .cal-cell.today .cal-day-num {
+      background: var(--today-ring); color: white;
+    }
+    .cal-cell.other-month .cal-day-num { color: var(--other-month); }
+
+    /* ── Event pills (month view) ────────────────────────── */
+    .ev-pill {
+      display: block; width: 100%; margin-bottom: 2px;
+      padding: 1px 5px; border-radius: 4px;
+      font-size: 0.68rem; font-weight: 600; color: white;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      cursor: pointer; line-height: 1.6;
+    }
+    .ev-pill.synced { opacity: .65; }
+    .ev-pill .ev-time { opacity: .85; margin-right: 3px; }
+    .ev-more {
+      font-size: 0.65rem; color: var(--muted); font-weight: 600;
+      padding: 1px 4px; cursor: pointer;
+    }
+    .ev-more:hover { color: var(--accent); }
+
+    /* ── Agenda view ─────────────────────────────────────── */
+    .agenda { }
+    .agenda-day-heading {
+      font-size: 0.78rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .05em; color: var(--muted);
+      padding: 14px 0 6px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .agenda-day-heading .day-num {
+      font-size: 1.4rem; font-weight: 800; color: var(--text);
+      text-transform: none; letter-spacing: 0;
+      line-height: 1;
+    }
+    .agenda-day-heading.today-heading .day-num { color: var(--today-ring); }
+    .agenda-event {
+      display: flex; align-items: flex-start; gap: 12px;
+      padding: 10px 14px; background: var(--card);
+      border: 1px solid var(--border); border-radius: 8px;
+      margin-bottom: 6px; cursor: pointer; transition: border-color .15s;
+    }
+    .agenda-event:hover { border-color: var(--accent); }
+    .agenda-event.synced { opacity: .75; }
+    .ev-color-bar { width: 4px; border-radius: 2px; flex-shrink: 0; align-self: stretch; }
+    .agenda-time { font-size: 0.78rem; color: var(--muted); min-width: 70px; flex-shrink: 0; padding-top: 2px; font-weight: 500; }
+    .agenda-body { flex: 1; min-width: 0; }
+    .agenda-title { font-weight: 600; font-size: 0.9rem; margin-bottom: 2px; }
+    .agenda-meta { font-size: 0.75rem; color: var(--muted); }
+    .agenda-empty { text-align: center; padding: 40px; color: var(--muted); font-size: 0.9rem; }
+
+    /* ── Day panel ───────────────────────────────────────── */
+    .day-panel-backdrop {
+      position: fixed; inset: 0; background: rgba(0,0,0,.35);
+      display: flex; align-items: flex-end; justify-content: center; z-index: 50;
+    }
+    @media (min-width: 600px) { .day-panel-backdrop { align-items: center; padding: 20px; } }
+    .day-panel {
+      background: white; border-radius: var(--radius) var(--radius) 0 0;
+      width: 100%; max-width: 500px; padding: 20px;
+      max-height: 75vh; overflow-y: auto;
+    }
+    @media (min-width: 600px) { .day-panel { border-radius: var(--radius); } }
+    .day-panel-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+    .day-panel-title { font-size: 1rem; font-weight: 700; }
+    .day-panel-event {
+      display: flex; align-items: flex-start; gap: 10px;
+      padding: 10px; border-radius: 8px; border: 1px solid var(--border);
+      margin-bottom: 8px; cursor: pointer;
+    }
+    .day-panel-event:hover { border-color: var(--accent); }
+    .day-panel-event .time { font-size: 0.75rem; color: var(--muted); min-width: 60px; padding-top: 1px; }
+    .day-panel-event .ev-title { font-weight: 600; font-size: 0.88rem; }
+    .day-panel-event .ev-loc { font-size: 0.75rem; color: var(--muted); }
+
+    /* ── Modal ───────────────────────────────────────────── */
+    .modal-backdrop {
+      position: fixed; inset: 0; background: rgba(0,0,0,.45);
+      display: flex; align-items: flex-end; justify-content: center; z-index: 100;
+    }
+    @media (min-width: 600px) { .modal-backdrop { align-items: center; padding: 20px; } }
+    .modal {
+      background: white; border-radius: var(--radius) var(--radius) 0 0;
+      width: 100%; max-width: 540px; padding: 22px;
+      max-height: 94vh; overflow-y: auto;
+    }
+    @media (min-width: 600px) { .modal { border-radius: var(--radius); } }
+    .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+    .modal-header h3 { font-size: 1.05rem; font-weight: 700; }
+
+    .form-row { margin-bottom: 13px; }
+    .form-label {
+      display: block; font-size: 0.72rem; font-weight: 700;
+      color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px;
+    }
+    .form-input, .form-select, .form-textarea {
+      width: 100%; border: 1.5px solid var(--border); border-radius: 7px;
+      padding: 8px 11px; font-size: 0.9rem; outline: none; font-family: inherit;
+      transition: border-color .15s; background: white;
+    }
+    .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--accent); }
+    .form-textarea { resize: vertical; min-height: 60px; }
+    .form-inline { display: flex; gap: 8px; align-items: flex-start; }
+    .form-inline > * { flex: 1; }
+    .muted-label { font-weight: 400; text-transform: none; }
+
+    /* ── Color picker ────────────────────────────────────── */
+    .color-swatches { display: flex; gap: 6px; flex-wrap: wrap; }
+    .color-swatch {
+      width: 26px; height: 26px; border-radius: 50%; cursor: pointer;
+      border: 2.5px solid transparent; transition: all .12s;
+    }
+    .color-swatch.selected { border-color: #111827; transform: scale(1.15); }
+
+    /* ── Attendee toggles ────────────────────────────────── */
+    .attendee-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+    .attendee-btn {
+      display: flex; align-items: center; gap: 5px;
+      padding: 4px 10px; border-radius: 20px;
+      border: 1.5px solid var(--border); cursor: pointer;
+      font-size: 0.8rem; font-weight: 500; color: var(--muted);
+      background: transparent; transition: all .12s;
+    }
+    .attendee-btn.selected { border-color: var(--accent); background: var(--accent-light); color: var(--accent); }
+    .attendee-av { width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.55rem; font-weight: 700; color: white; }
+
+    /* ── Recurrence section ──────────────────────────────── */
+    .rec-section { border-top: 1px solid var(--border); padding-top: 12px; margin-top: 4px; }
+    .days-grid { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px; }
+    .day-toggle {
+      width: 34px; height: 34px; border-radius: 50%;
+      border: 1.5px solid var(--border); cursor: pointer;
+      font-size: 0.72rem; font-weight: 700; color: var(--muted); background: transparent;
+    }
+    .day-toggle.selected { border-color: var(--accent); background: var(--accent); color: white; }
+
+    /* ── Scope modal ─────────────────────────────────────── */
+    .scope-option {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 14px; border: 1.5px solid var(--border);
+      border-radius: 8px; cursor: pointer; margin-bottom: 8px;
+      transition: all .12s;
+    }
+    .scope-option:hover { border-color: var(--accent); background: var(--accent-light); }
+    .scope-option .scope-icon { font-size: 1.1rem; }
+    .scope-option .scope-label { font-weight: 600; font-size: 0.88rem; }
+    .scope-option .scope-desc { font-size: 0.75rem; color: var(--muted); }
+
+    /* ── Event detail ────────────────────────────────────── */
+    .ev-detail-color { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+    .ev-detail-row { display: flex; gap: 10px; margin-bottom: 8px; font-size: 0.88rem; }
+    .ev-detail-icon { width: 18px; text-align: center; color: var(--muted); flex-shrink: 0; padding-top: 1px; }
+    .ev-detail-val { flex: 1; }
+    .recurrence-badge { display: inline-block; font-size: 0.72rem; background: var(--accent-light); color: var(--accent); padding: 2px 8px; border-radius: 20px; font-weight: 600; }
+
+    /* ── Toggle ──────────────────────────────────────────── */
+    .toggle-row { display: flex; align-items: center; justify-content: space-between; }
+    .toggle-switch { position: relative; width: 40px; height: 22px; }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider { position: absolute; inset: 0; background: var(--border); border-radius: 22px; cursor: pointer; transition: .2s; }
+    .toggle-slider:before { content: ""; position: absolute; height: 16px; width: 16px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: .2s; }
+    .toggle-switch input:checked + .toggle-slider { background: var(--accent); }
+    .toggle-switch input:checked + .toggle-slider:before { transform: translateX(18px); }
+
+    .modal-actions { display: flex; gap: 8px; margin-top: 18px; flex-wrap: wrap; }
+    .modal-actions .btn { flex: 1; justify-content: center; min-width: 90px; }
+
+    .loading { text-align: center; padding: 40px; color: var(--muted); }
+    .divider { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
+  </style>
+  <base href="/run/calendar/" />
+</head>
+<body>
+<div class="app">
+  <div class="app-header">
+    <div class="nav-group">
+      <button class="btn-icon" onclick="prevPeriod()">‹</button>
+      <span class="cal-title" id="cal-title">…</span>
+      <button class="btn-icon" onclick="nextPeriod()">›</button>
+      <button class="btn btn-ghost btn-sm" onclick="goToday()">Today</button>
+    </div>
+    <div class="nav-group">
+      <div class="view-toggle">
+        <button id="vbtn-month" onclick="setView('month')">Month</button>
+        <button id="vbtn-agenda" onclick="setView('agenda')">Agenda</button>
+      </div>
+      <button class="btn btn-primary" onclick="openCreateModal()">+ Event</button>
+    </div>
+  </div>
+  <div id="root"><div class="loading">Loading…</div></div>
+</div>
+
+<script type="module">
+import { memberColor, initial, esc, isAdult } from "/hub-sdk.js";
+
+const CONTEXT = window.__CONTEXT_URL ?? "";
+const DB      = window.__DB_URL      ?? "";
+const ME      = window.__CURRENT_MEMBER ?? null;
+
+// ─── State ────────────────────────────────────────────────────────────────
+let members      = [];
+let localEvents  = [];  // all rows from DB (primaries + exceptions)
+let syncedEvents = [];  // from family.calendar context
+let viewMode     = "month";
+let pivot        = new Date(); // current month / agenda start
+let modalEl      = null;
+let panelEl      = null;
+
+// ─── Date utilities ───────────────────────────────────────────────────────
+const toDateStr  = d => `${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`;
+const p2         = n => String(n).padStart(2,"0");
+const parseLD    = s => { const [y,m,d] = s.split("-").map(Number); return new Date(y,m-1,d); };
+const addDaysObj = (d,n) => { const r = new Date(d); r.setDate(r.getDate()+n); return r; };
+const addDayStr  = (s,n) => toDateStr(addDaysObj(parseLD(s),n));
+const todayStr   = () => toDateStr(new Date());
+const daysBetween= (a,b) => Math.round((parseLD(b)-parseLD(a))/86400000);
+
+const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const DAYS_SHORT = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+const DAYS_ABBR  = ["Su","Mo","Tu","We","Th","Fr","Sa"];
+const DAY_NAMES  = ["sun","mon","tue","wed","thu","fri","sat"];
+
+const EVENT_COLORS = ["#0f766e","#4f46e5","#0891b2","#16a34a","#d97706","#dc2626","#7c3aed","#db2777"];
+
+function fmtTime(t) {
+  if (!t) return "";
+  const [h,m] = t.split(":").map(Number);
+  const ampm = h < 12 ? "AM" : "PM";
+  const hr = h % 12 || 12;
+  return m === 0 ? `${hr} ${ampm}` : `${hr}:${p2(m)} ${ampm}`;
+}
+function fmtDate(s, { weekday = false } = {}) {
+  const d = parseLD(s);
+  const opts = { month: "short", day: "numeric", year: "numeric" };
+  if (weekday) opts.weekday = "long";
+  return d.toLocaleDateString("en-US", opts);
+}
+function fmtDateShort(s) {
+  return parseLD(s).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+function describeRecurrence(rule) {
+  if (!rule) return "";
+  const { freq, interval = 1, days } = rule;
+  const n = interval === 1 ? "" : `${interval} `;
+  if (freq === "daily")   return interval === 1 ? "Daily" : `Every ${interval} days`;
+  if (freq === "weekly") {
+    const dayStr = days?.length ? days.map(d => d[0].toUpperCase() + d[1]).join(", ") : "";
+    return interval === 1 ? `Weekly${dayStr ? " on " + dayStr : ""}` : `Every ${n}weeks${dayStr ? " on " + dayStr : ""}`;
+  }
+  if (freq === "monthly") return interval === 1 ? "Monthly" : `Every ${n}months`;
+  if (freq === "yearly")  return interval === 1 ? "Yearly"  : `Every ${n}years`;
+  return "";
+}
+
+// ─── DB ───────────────────────────────────────────────────────────────────
+async function db(sql, params = []) {
+  if (!DB) return { rows: [] };
+  const res = await fetch(DB, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sql, params }) });
+  return res.json();
+}
+
+async function initDb() {
+  await db(`CREATE TABLE IF NOT EXISTS events (
+    id                TEXT PRIMARY KEY,
+    title             TEXT NOT NULL,
+    description       TEXT NOT NULL DEFAULT '',
+    location          TEXT NOT NULL DEFAULT '',
+    start_date        TEXT NOT NULL,
+    start_time        TEXT,
+    end_date          TEXT NOT NULL,
+    end_time          TEXT,
+    all_day           INTEGER NOT NULL DEFAULT 0,
+    color             TEXT NOT NULL DEFAULT '#0f766e',
+    organizer_id      TEXT,
+    attendee_ids      TEXT NOT NULL DEFAULT '[]',
+    recurrence        TEXT,
+    recurring_event_id TEXT,
+    original_date     TEXT,
+    is_cancelled      INTEGER NOT NULL DEFAULT 0,
+    source            TEXT NOT NULL DEFAULT 'local',
+    created_by        TEXT,
+    created_at        TEXT NOT NULL,
+    updated_at        TEXT NOT NULL
+  )`);
+}
+
+async function loadLocalEvents() {
+  const { rows } = await db(`SELECT * FROM events WHERE source = 'local' ORDER BY start_date, start_time`);
+  localEvents = rows ?? [];
+}
+
+async function loadSyncedEvents() {
+  if (!CONTEXT) return;
+  try {
+    const res  = await fetch(`${CONTEXT}?keys=family.calendar`);
+    const data = await res.json();
+    const raw  = data["family.calendar"] ?? [];
+    syncedEvents = raw.map(ev => ({
+      id:         ev.id ?? crypto.randomUUID(),
+      title:      ev.title ?? ev.summary ?? "Event",
+      description: ev.description ?? "",
+      location:   ev.location ?? "",
+      start_date: normalizeDate(ev.start_at ?? ev.start_date ?? ev.date),
+      start_time: normalizeTime(ev.start_at),
+      end_date:   normalizeDate(ev.end_at ?? ev.end_date ?? ev.date),
+      end_time:   normalizeTime(ev.end_at),
+      all_day:    ev.all_day ? 1 : 0,
+      color:      "#6b7280",
+      organizer_id: ev.family_member_id ?? null,
+      attendee_ids: "[]",
+      source:     "synced",
+    }));
+  } catch { syncedEvents = []; }
+}
+
+function normalizeDate(iso) {
+  if (!iso) return todayStr();
+  return iso.includes("T") ? iso.split("T")[0] : iso.slice(0,10);
+}
+function normalizeTime(iso) {
+  if (!iso || !iso.includes("T")) return null;
+  const t = iso.split("T")[1];
+  if (!t) return null;
+  const [h,m] = t.split(":");
+  return `${h}:${m}`;
+}
+
+// ─── Recurrence expansion ─────────────────────────────────────────────────
+function eventsForRange(rangeStart, rangeEnd) {
+  const results = [];
+
+  // Index exceptions by parent id + original date
+  const exMap = {};
+  for (const ev of localEvents) {
+    if (ev.recurring_event_id) {
+      if (!exMap[ev.recurring_event_id]) exMap[ev.recurring_event_id] = {};
+      exMap[ev.recurring_event_id][ev.original_date] = ev;
+    }
+  }
+
+  // Process local events
+  for (const ev of localEvents) {
+    if (ev.recurring_event_id) continue; // handled via parent
+
+    if (!ev.recurrence) {
+      if (ev.start_date <= rangeEnd && ev.end_date >= rangeStart)
+        results.push({ ...ev, _date: ev.start_date });
+    } else {
+      const rule = JSON.parse(ev.recurrence);
+      const occs = occurrencesInRange(ev.start_date, rule, rangeStart, rangeEnd);
+      const durDays = daysBetween(ev.start_date, ev.end_date);
+
+      for (const occ of occs) {
+        const ex = exMap[ev.id]?.[occ];
+        if (ex?.is_cancelled) continue;
+        if (ex) {
+          results.push({ ...ex, _date: ex.start_date, _primaryId: ev.id, _occDate: occ });
+        } else {
+          results.push({ ...ev, start_date: occ, end_date: addDayStr(occ, durDays), _date: occ, _virtual: true, _primaryId: ev.id, _occDate: occ });
+        }
+      }
+    }
+  }
+
+  // Merge synced events (read-only)
+  for (const ev of syncedEvents) {
+    if (ev.start_date <= rangeEnd && ev.end_date >= rangeStart)
+      results.push({ ...ev, _date: ev.start_date });
+  }
+
+  return results.sort((a, b) => {
+    const dc = a._date.localeCompare(b._date);
+    if (dc !== 0) return dc;
+    if (a.all_day !== b.all_day) return a.all_day ? -1 : 1;
+    if (a.start_time && b.start_time) return a.start_time.localeCompare(b.start_time);
+    return 0;
+  });
+}
+
+function occurrencesInRange(startDate, rule, rangeStart, rangeEnd) {
+  const results = [];
+  const rs = parseLD(rangeStart), re = parseLD(rangeEnd);
+  const ruleEnd = rule.end_date ? parseLD(rule.end_date) : null;
+  let count = 0, maxCount = rule.count ?? 10000;
+
+  // Advance cursor efficiently to near range start
+  let cursor = parseLD(startDate);
+  if (cursor < rs) {
+    const { freq, interval: iv = 1 } = rule;
+    if (freq === "daily") {
+      const skip = Math.max(0, Math.floor((rs - cursor) / 86400000 / iv) - 1);
+      cursor = addDaysObj(cursor, skip * iv);
+    } else if (freq === "weekly" && (!rule.days || rule.days.length <= 1)) {
+      const skip = Math.max(0, Math.floor((rs - cursor) / (86400000 * 7 * iv)) - 1);
+      cursor = addDaysObj(cursor, skip * 7 * iv);
+    } else if (freq === "monthly") {
+      const mo = (rs.getFullYear() - cursor.getFullYear()) * 12 + rs.getMonth() - cursor.getMonth();
+      cursor.setMonth(cursor.getMonth() + Math.max(0, Math.floor(mo / iv) - 1) * iv);
+    } else if (freq === "yearly") {
+      const yr = rs.getFullYear() - cursor.getFullYear();
+      cursor.setFullYear(cursor.getFullYear() + Math.max(0, Math.floor(yr / iv) - 1) * iv);
+    }
+  }
+
+  let iter = 0;
+  while (cursor <= re && count < maxCount && iter++ < 3000) {
+    if (ruleEnd && cursor > ruleEnd) break;
+    if (cursor >= rs) { results.push(toDateStr(cursor)); count++; }
+    cursor = advanceCursor(cursor, rule);
+  }
+  return results;
+}
+
+function advanceCursor(d, rule) {
+  const next = new Date(d);
+  const { freq, interval: iv = 1, days } = rule;
+  if (freq === "daily") {
+    next.setDate(next.getDate() + iv);
+  } else if (freq === "weekly") {
+    if (days?.length > 1) {
+      const sel = days.map(x => DAY_NAMES.indexOf(x)).filter(x => x >= 0).sort((a,b) => a-b);
+      const cur = next.getDay();
+      const nxt = sel.find(x => x > cur);
+      if (nxt != null) next.setDate(next.getDate() + (nxt - cur));
+      else next.setDate(next.getDate() + (7 * iv - cur + sel[0]));
+    } else {
+      next.setDate(next.getDate() + 7 * iv);
+    }
+  } else if (freq === "monthly") {
+    next.setMonth(next.getMonth() + iv);
+  } else if (freq === "yearly") {
+    next.setFullYear(next.getFullYear() + iv);
+  }
+  return next;
+}
+
+// ─── Render main ──────────────────────────────────────────────────────────
+function updateTitle() {
+  const el = document.getElementById("cal-title");
+  if (!el) return;
+  if (viewMode === "month") {
+    el.textContent = `${MONTHS[pivot.getMonth()]} ${pivot.getFullYear()}`;
+  } else {
+    el.textContent = "Upcoming";
+  }
+  document.querySelectorAll(".view-toggle button").forEach(b => b.classList.remove("active"));
+  const btn = document.getElementById(`vbtn-${viewMode}`);
+  if (btn) btn.classList.add("active");
+}
+
+function render() {
+  updateTitle();
+  if (viewMode === "month") renderMonth();
+  else renderAgenda();
+}
+
+function renderMonth() {
+  const year = pivot.getFullYear(), month = pivot.getMonth();
+  const firstDay = new Date(year, month, 1);
+  const gridStart = addDaysObj(firstDay, -firstDay.getDay());
+  const gridEnd   = addDaysObj(gridStart, 41);
+
+  const rangeStart = toDateStr(gridStart), rangeEnd = toDateStr(gridEnd);
+  const evs = eventsForRange(rangeStart, rangeEnd);
+
+  // Group by date
+  const byDate = {};
+  for (const ev of evs) {
+    if (!byDate[ev._date]) byDate[ev._date] = [];
+    byDate[ev._date].push(ev);
+  }
+
+  const dowHtml = DAYS_SHORT.map(d => `<div class="cal-dow">${d}</div>`).join("");
+  let cellsHtml = "";
+  let cur = new Date(gridStart);
+  const today = todayStr();
+
+  while (cur <= gridEnd) {
+    const ds  = toDateStr(cur);
+    const isT = ds === today;
+    const inM = cur.getMonth() === month;
+    const dayEvs = byDate[ds] ?? [];
+    const show   = dayEvs.slice(0, 3);
+    const more   = dayEvs.length - show.length;
+
+    const pillsHtml = show.map(ev => {
+      const timeStr = ev.all_day ? "" : `<span class="ev-time">${fmtTime(ev.start_time)}</span>`;
+      return `<span class="ev-pill${ev.source==="synced"?" synced":""}" style="background:${ev.color}"
+        onclick="event.stopPropagation();showEvent('${ev.id}','${ds}','${ev._primaryId??ev.id}','${ev._occDate??ds}')"
+        title="${esc(ev.title)}">${timeStr}${esc(ev.title)}</span>`;
+    }).join("");
+    const moreHtml = more > 0 ? `<div class="ev-more" onclick="event.stopPropagation();openDayPanel('${ds}')">+${more} more</div>` : "";
+
+    cellsHtml += `<div class="cal-cell${isT?" today":""}${!inM?" other-month":""}" onclick="openDayPanel('${ds}')">
+      <div class="cal-day-num">${cur.getDate()}</div>
+      ${pillsHtml}${moreHtml}
+    </div>`;
+    cur.setDate(cur.getDate() + 1);
+  }
+
+  document.getElementById("root").innerHTML = `<div class="cal-grid">${dowHtml}${cellsHtml}</div>`;
+}
+
+function renderAgenda() {
+  const start = toDateStr(pivot);
+  const end   = addDayStr(start, 60);
+  const evs   = eventsForRange(start, end);
+
+  if (!evs.length) {
+    document.getElementById("root").innerHTML = `<div class="agenda-empty">No events in the next 60 days.</div>`;
+    return;
+  }
+
+  const today = todayStr();
+  let lastDate = null;
+  let html = "";
+
+  for (const ev of evs) {
+    if (ev._date !== lastDate) {
+      const d  = parseLD(ev._date);
+      const isT = ev._date === today;
+      const label = isT ? "Today" : ev._date === addDayStr(today,1) ? "Tomorrow"
+        : d.toLocaleDateString("en-US", { weekday:"long", month:"long", day:"numeric" });
+      html += `<div class="agenda-day-heading${isT?" today-heading":""}"><span class="day-num">${d.getDate()}</span>${label}</div>`;
+      lastDate = ev._date;
+    }
+    const timeStr = ev.all_day ? "All day" : [fmtTime(ev.start_time), fmtTime(ev.end_time)].filter(Boolean).join(" – ");
+    const meta = [ev.location, ev.description].filter(Boolean).map(s => s.slice(0,80)).join(" · ");
+    html += `<div class="agenda-event${ev.source==="synced"?" synced":""}"
+      onclick="showEvent('${ev.id}','${ev._date}','${ev._primaryId??ev.id}','${ev._occDate??ev._date}')">
+      <div class="ev-color-bar" style="background:${ev.color}"></div>
+      <div class="agenda-time">${timeStr}</div>
+      <div class="agenda-body">
+        <div class="agenda-title">${esc(ev.title)}</div>
+        ${meta ? `<div class="agenda-meta">${esc(meta)}</div>` : ""}
+      </div>
+    </div>`;
+  }
+  document.getElementById("root").innerHTML = `<div class="agenda">${html}</div>`;
+}
+
+// ─── Day panel ────────────────────────────────────────────────────────────
+function openDayPanel(dateStr) {
+  closePanels();
+  const evs   = eventsForRange(dateStr, dateStr);
+  const dLabel = parseLD(dateStr).toLocaleDateString("en-US", { weekday:"long", month:"long", day:"numeric", year:"numeric" });
+  const isToday = dateStr === todayStr();
+  const evRows = evs.map(ev => {
+    const timeStr = ev.all_day ? "All day" : fmtTime(ev.start_time) + (ev.end_time ? " – " + fmtTime(ev.end_time) : "");
+    return `<div class="day-panel-event" onclick="showEvent('${ev.id}','${dateStr}','${ev._primaryId??ev.id}','${ev._occDate??dateStr}')">
+      <div style="width:4px;background:${ev.color};border-radius:2px;flex-shrink:0;align-self:stretch"></div>
+      <div class="time">${timeStr}</div>
+      <div><div class="ev-title">${esc(ev.title)}</div>${ev.location ? `<div class="ev-loc">${esc(ev.location)}</div>` : ""}</div>
+    </div>`;
+  }).join("") || `<div style="color:var(--muted);font-size:.85rem;padding:8px 0">No events.</div>`;
+
+  panelEl = document.createElement("div");
+  panelEl.className = "day-panel-backdrop";
+  panelEl.innerHTML = `<div class="day-panel">
+    <div class="day-panel-header">
+      <div class="day-panel-title">${isToday ? "Today — " : ""}${dLabel}</div>
+      <button class="btn btn-ghost btn-sm" onclick="closePanels()">✕</button>
+    </div>
+    ${evRows}
+    <div style="margin-top:12px">
+      <button class="btn btn-primary btn-sm" onclick="closePanels();openCreateModal('${dateStr}')">+ Add event</button>
+    </div>
+  </div>`;
+  panelEl.addEventListener("click", e => { if (e.target === panelEl) closePanels(); });
+  document.body.appendChild(panelEl);
+}
+
+function closePanels() { panelEl?.remove(); panelEl = null; }
+
+// ─── Event detail / view ──────────────────────────────────────────────────
+function showEvent(evId, dateStr, primaryId, occDate) {
+  closePanels();
+  closeModal();
+
+  // Find the event to display (exception or virtual occurrence)
+  const primary = localEvents.find(e => e.id === primaryId) ?? syncedEvents.find(e => e.id === evId);
+  const exception = localEvents.find(e => e.recurring_event_id === primaryId && e.original_date === occDate);
+  const ev = exception ?? localEvents.find(e => e.id === evId) ?? primary;
+  if (!ev) return;
+
+  const isSynced  = ev.source === "synced";
+  const isRecurring = !!primary?.recurrence;
+  const ruleLabel = isRecurring ? describeRecurrence(JSON.parse(primary.recurrence)) : "";
+
+  const attendees = JSON.parse(ev.attendee_ids || "[]");
+  const attHtml = attendees.map(id => {
+    const m = members.find(x => x.id === id);
+    if (!m) return "";
+    return `<span style="display:inline-flex;align-items:center;gap:4px;font-size:.8rem;margin-right:6px">
+      <span style="width:16px;height:16px;border-radius:50%;background:${memberColor(id,members)};display:inline-flex;align-items:center;justify-content:center;font-size:.5rem;font-weight:700;color:white">${initial(m.name)}</span>
+      ${esc(m.name)}</span>`;
+  }).join("");
+
+  const timeStr = ev.all_day ? "All day" : [fmtTime(ev.start_time), fmtTime(ev.end_time)].filter(Boolean).join(" – ");
+  const dateRange = ev.start_date === ev.end_date ? fmtDate(ev.start_date, {weekday:true})
+    : `${fmtDateShort(ev.start_date)} – ${fmtDateShort(ev.end_date)}`;
+
+  openModal(`
+    <div class="modal-header">
+      <h3 style="display:flex;align-items:center;gap:8px">
+        <span class="ev-detail-color" style="background:${ev.color}"></span>${esc(ev.title)}
+      </h3>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal()">✕</button>
+    </div>
+    <div class="ev-detail-row"><div class="ev-detail-icon">📅</div><div class="ev-detail-val">${dateRange}${timeStr ? " · " + timeStr : ""}</div></div>
+    ${ev.location ? `<div class="ev-detail-row"><div class="ev-detail-icon">📍</div><div class="ev-detail-val">${esc(ev.location)}</div></div>` : ""}
+    ${ruleLabel ? `<div class="ev-detail-row"><div class="ev-detail-icon">🔁</div><div class="ev-detail-val"><span class="recurrence-badge">${ruleLabel}</span></div></div>` : ""}
+    ${attHtml ? `<div class="ev-detail-row"><div class="ev-detail-icon">👥</div><div class="ev-detail-val">${attHtml}</div></div>` : ""}
+    ${ev.description ? `<div class="ev-detail-row"><div class="ev-detail-icon">📝</div><div class="ev-detail-val" style="color:var(--muted)">${esc(ev.description)}</div></div>` : ""}
+    ${isSynced ? `<div style="font-size:.75rem;color:var(--muted);margin-top:8px">Synced from external calendar — editing not available here.</div>` : ""}
+    <div class="modal-actions">
+      ${!isSynced ? `<button class="btn btn-ghost" onclick="closeModal();openEditModal('${primary?.id ?? ev.id}','${occDate}')">Edit</button>
+      <button class="btn btn-danger btn-sm" onclick="closeModal();confirmDelete('${primary?.id ?? ev.id}','${occDate}',${isRecurring})">Delete</button>` : ""}
+      <button class="btn btn-ghost" onclick="closeModal()">Close</button>
+    </div>`);
+}
+
+// ─── Create / edit modal ──────────────────────────────────────────────────
+function buildEventForm(ev, opts = {}) {
+  const colorsHtml = EVENT_COLORS.map(c =>
+    `<button type="button" class="color-swatch${(ev.color ?? EVENT_COLORS[0]) === c ? " selected" : ""}"
+      style="background:${c}" onclick="selectColor(this,'${c}')" title="${c}"></button>`
+  ).join("");
+
+  const attsHtml = members.map(m => {
+    const sel = (JSON.parse(ev.attendee_ids || "[]")).includes(m.id);
+    return `<button type="button" class="attendee-btn${sel ? " selected" : ""}" data-mid="${m.id}" onclick="toggleAttendee(this)">
+      <span class="attendee-av" style="background:${memberColor(m.id, members)}">${initial(m.name)}</span>
+      ${esc(m.name)}</button>`;
+  }).join("");
+
+  const rule = ev.recurrence ? JSON.parse(ev.recurrence) : null;
+  const freq = rule?.freq ?? "none";
+  const recOpts = [["none","Does not repeat"],["daily","Daily"],["weekdays","Weekdays (Mon–Fri)"],["weekly","Weekly"],["biweekly","Every 2 weeks"],["monthly","Monthly"],["yearly","Yearly"]]
+    .map(([v,l]) => `<option value="${v}" ${freq === v || (v === "weekdays" && freq === "weekly" && rule?.days?.length > 1) ? "selected" : ""}>${l}</option>`).join("");
+
+  const selDays = rule?.days ?? [];
+  const dayToggles = DAY_NAMES.map((d, i) =>
+    `<button type="button" class="day-toggle${selDays.includes(d)?" selected":""}" data-day="${d}" onclick="this.classList.toggle('selected')">${DAYS_ABBR[i]}</button>`
+  ).join("");
+
+  const endType = rule?.end_type ?? "never";
+
+  return `
+    <input type="hidden" id="ef-color" value="${ev.color ?? EVENT_COLORS[0]}" />
+    <div class="form-row">
+      <label class="form-label">Title</label>
+      <input id="ef-title" class="form-input" type="text" value="${esc(ev.title ?? "")}" placeholder="Event title" autofocus />
+    </div>
+    <div class="form-row toggle-row">
+      <label class="form-label" style="margin-bottom:0">All day</label>
+      <label class="toggle-switch"><input type="checkbox" id="ef-allday" ${ev.all_day ? "checked" : ""} onchange="toggleAllDay(this)" /><span class="toggle-slider"></span></label>
+    </div>
+    <div class="form-row">
+      <label class="form-label">Start</label>
+      <div class="form-inline">
+        <input id="ef-start-date" class="form-input" type="date" value="${ev.start_date ?? opts.defaultDate ?? todayStr()}" />
+        <input id="ef-start-time" class="form-input" type="time" value="${ev.start_time ?? "09:00"}" style="${ev.all_day ? "display:none" : ""}" />
+      </div>
+    </div>
+    <div class="form-row">
+      <label class="form-label">End</label>
+      <div class="form-inline">
+        <input id="ef-end-date" class="form-input" type="date" value="${ev.end_date ?? opts.defaultDate ?? todayStr()}" />
+        <input id="ef-end-time" class="form-input" type="time" value="${ev.end_time ?? "10:00"}" style="${ev.all_day ? "display:none" : ""}" />
+      </div>
+    </div>
+    <div class="form-row">
+      <label class="form-label">Location</label>
+      <input id="ef-loc" class="form-input" type="text" value="${esc(ev.location ?? "")}" placeholder="Add location" />
+    </div>
+    <div class="form-row">
+      <label class="form-label">Color</label>
+      <div class="color-swatches">${colorsHtml}</div>
+    </div>
+    ${members.length > 0 ? `<div class="form-row"><label class="form-label">Attendees</label><div class="attendee-grid">${attsHtml}</div></div>` : ""}
+    <div class="form-row">
+      <label class="form-label">Description</label>
+      <textarea id="ef-desc" class="form-textarea">${esc(ev.description ?? "")}</textarea>
+    </div>
+    <div class="rec-section">
+      <div class="form-row">
+        <label class="form-label">Repeats</label>
+        <select id="ef-freq" class="form-select" onchange="toggleRecFields(this.value)">${recOpts}</select>
+      </div>
+      <div id="rec-days-row" style="${freq === "weekly" || (rule?.days?.length > 1) ? "" : "display:none"}">
+        <div class="form-row"><label class="form-label">On days</label><div class="days-grid">${dayToggles}</div></div>
+      </div>
+      <div id="rec-ends-row" style="${freq === "none" ? "display:none" : ""}">
+        <div class="form-row">
+          <label class="form-label">Ends</label>
+          <select id="ef-end-type" class="form-select" onchange="toggleEndFields(this.value)">
+            <option value="never" ${endType==="never"?"selected":""}>Never</option>
+            <option value="count" ${endType==="count"?"selected":""}>After N occurrences</option>
+            <option value="date"  ${endType==="date" ?"selected":""}>On date</option>
+          </select>
+        </div>
+        <div id="rec-count-row" style="${endType==="count" ? "" : "display:none"}">
+          <div class="form-row"><label class="form-label">Occurrences</label><input id="ef-count" class="form-input" type="number" min="2" max="999" value="${rule?.count ?? 10}" style="max-width:120px" /></div>
+        </div>
+        <div id="rec-date-row" style="${endType==="date" ? "" : "display:none"}">
+          <div class="form-row"><label class="form-label">End date</label><input id="ef-end-date-rec" class="form-input" type="date" value="${rule?.end_date ?? addDayStr(todayStr(), 365)}" /></div>
+        </div>
+      </div>
+    </div>`;
+}
+
+window.toggleAllDay = function(cb) {
+  const timeInputs = document.querySelectorAll("#ef-start-time, #ef-end-time");
+  timeInputs.forEach(el => el.style.display = cb.checked ? "none" : "");
+};
+window.selectColor = function(btn, color) {
+  document.getElementById("ef-color").value = color;
+  document.querySelectorAll(".color-swatch").forEach(b => b.classList.remove("selected"));
+  btn.classList.add("selected");
+};
+window.toggleAttendee = function(btn) { btn.classList.toggle("selected"); };
+window.toggleRecFields = function(freq) {
+  document.getElementById("rec-days-row").style.display  = freq === "weekly" ? "" : "none";
+  document.getElementById("rec-ends-row").style.display = freq === "none" ? "none" : "";
+};
+window.toggleEndFields = function(type) {
+  document.getElementById("rec-count-row").style.display = type === "count" ? "" : "none";
+  document.getElementById("rec-date-row").style.display  = type === "date"  ? "" : "none";
+};
+
+function collectFormData() {
+  const allDay = document.getElementById("ef-allday").checked;
+  const freq   = document.getElementById("ef-freq").value;
+  const endType = document.getElementById("ef-end-type")?.value ?? "never";
+  const selDays = [...document.querySelectorAll(".day-toggle.selected")].map(b => b.dataset.day);
+  const attendees = [...document.querySelectorAll(".attendee-btn.selected")].map(b => b.dataset.mid);
+
+  let recurrence = null;
+  if (freq !== "none") {
+    const rule = { freq: freq === "biweekly" ? "weekly" : freq === "weekdays" ? "weekly" : freq, interval: freq === "biweekly" ? 2 : 1, end_type: endType };
+    if (freq === "weekly" && selDays.length > 0) rule.days = selDays;
+    if (freq === "weekdays") rule.days = ["mon","tue","wed","thu","fri"];
+    if (endType === "count") rule.count = parseInt(document.getElementById("ef-count").value) || 10;
+    if (endType === "date")  rule.end_date = document.getElementById("ef-end-date-rec").value;
+    recurrence = JSON.stringify(rule);
+  }
+
+  return {
+    title:        document.getElementById("ef-title").value.trim(),
+    description:  document.getElementById("ef-desc").value.trim(),
+    location:     document.getElementById("ef-loc").value.trim(),
+    start_date:   document.getElementById("ef-start-date").value,
+    start_time:   allDay ? null : (document.getElementById("ef-start-time").value || null),
+    end_date:     document.getElementById("ef-end-date").value,
+    end_time:     allDay ? null : (document.getElementById("ef-end-time").value || null),
+    all_day:      allDay ? 1 : 0,
+    color:        document.getElementById("ef-color").value,
+    attendee_ids: JSON.stringify(attendees),
+    recurrence,
+  };
+}
+
+function openCreateModal(defaultDate = null) {
+  openModal(`
+    <div class="modal-header"><h3>New Event</h3><button class="btn btn-ghost btn-sm" onclick="closeModal()">✕</button></div>
+    ${buildEventForm({}, { defaultDate })}
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="submitCreate()">Create Event</button>
+    </div>`);
+}
+
+window.submitCreate = async function() {
+  const data = collectFormData();
+  if (!data.title) { document.getElementById("ef-title").focus(); return; }
+  const id = crypto.randomUUID(), now = new Date().toISOString();
+  await db(`INSERT INTO events (id,title,description,location,start_date,start_time,end_date,end_time,all_day,color,organizer_id,attendee_ids,recurrence,source,created_by,created_at,updated_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'local',?,?,?)`,
+    [id, data.title, data.description, data.location, data.start_date, data.start_time, data.end_date, data.end_time,
+     data.all_day, data.color, ME?.id ?? null, data.attendee_ids, data.recurrence, ME?.id ?? null, now, now]);
+  await loadLocalEvents();
+  closeModal();
+  render();
+};
+
+// ─── Edit event ───────────────────────────────────────────────────────────
+function openEditModal(primaryId, occDate) {
+  const primary = localEvents.find(e => e.id === primaryId);
+  if (!primary) return;
+  const isRecurring = !!primary.recurrence;
+
+  if (isRecurring) {
+    openScopeModal("edit", primaryId, occDate);
+  } else {
+    openDirectEdit(primary, "all", occDate);
+  }
+}
+
+function openDirectEdit(ev, scope, occDate) {
+  const primary = localEvents.find(e => e.id === (ev._primaryId ?? ev.id)) ?? ev;
+  // If editing "this event" on a recurring series, start from the exception or virtual event
+  const editTarget = (scope === "this" && ev.recurring_event_id) ? ev : (scope !== "all" ? { ...primary, start_date: occDate, end_date: occDate } : primary);
+
+  openModal(`
+    <div class="modal-header"><h3>Edit Event</h3><button class="btn btn-ghost btn-sm" onclick="closeModal()">✕</button></div>
+    ${buildEventForm(editTarget)}
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="submitEdit('${primary.id}','${scope}','${occDate}')">Save</button>
+    </div>`);
+}
+
+window.submitEdit = async function(primaryId, scope, occDate) {
+  const data = collectFormData();
+  if (!data.title) { document.getElementById("ef-title").focus(); return; }
+  const now = new Date().toISOString();
+  const primary = localEvents.find(e => e.id === primaryId);
+  if (!primary) return;
+
+  if (scope === "all" || !primary.recurrence) {
+    // Update the primary event
+    await db(`UPDATE events SET title=?,description=?,location=?,start_date=?,start_time=?,end_date=?,end_time=?,all_day=?,color=?,attendee_ids=?,recurrence=?,updated_at=? WHERE id=?`,
+      [data.title,data.description,data.location,data.start_date,data.start_time,data.end_date,data.end_time,data.all_day,data.color,data.attendee_ids,data.recurrence,now,primaryId]);
+  } else if (scope === "this") {
+    // Upsert an exception for this occurrence
+    const existing = localEvents.find(e => e.recurring_event_id === primaryId && e.original_date === occDate);
+    const durDays = daysBetween(primary.start_date, primary.end_date);
+    const endDate = data.end_date !== occDate ? data.end_date : addDayStr(data.start_date, durDays);
+    if (existing) {
+      await db(`UPDATE events SET title=?,description=?,location=?,start_date=?,start_time=?,end_date=?,end_time=?,all_day=?,color=?,attendee_ids=?,updated_at=? WHERE id=?`,
+        [data.title,data.description,data.location,data.start_date,data.start_time,endDate,data.end_time,data.all_day,data.color,data.attendee_ids,now,existing.id]);
+    } else {
+      const exId = crypto.randomUUID();
+      await db(`INSERT INTO events (id,title,description,location,start_date,start_time,end_date,end_time,all_day,color,organizer_id,attendee_ids,recurring_event_id,original_date,source,created_by,created_at,updated_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,'local',?,?,?)`,
+        [exId,data.title,data.description,data.location,data.start_date,data.start_time,endDate,data.end_time,data.all_day,data.color,ME?.id??null,data.attendee_ids,primaryId,occDate,ME?.id??null,now,now]);
+    }
+  } else if (scope === "following") {
+    // Truncate series the day before, create a new series from occDate
+    const rule = JSON.parse(primary.recurrence ?? "{}");
+    rule.end_date = addDayStr(occDate, -1);
+    await db(`UPDATE events SET recurrence=?,updated_at=? WHERE id=?`, [JSON.stringify(rule),now,primaryId]);
+    // New series starting from occDate with same data
+    const newId = crypto.randomUUID();
+    await db(`INSERT INTO events (id,title,description,location,start_date,start_time,end_date,end_time,all_day,color,organizer_id,attendee_ids,recurrence,source,created_by,created_at,updated_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'local',?,?,?)`,
+      [newId,data.title,data.description,data.location,occDate,data.start_time,occDate,data.end_time,data.all_day,data.color,ME?.id??null,data.attendee_ids,data.recurrence,ME?.id??null,now,now]);
+  }
+
+  await loadLocalEvents(); closeModal(); render();
+};
+
+// ─── Delete event ─────────────────────────────────────────────────────────
+function confirmDelete(primaryId, occDate, isRecurring) {
+  if (isRecurring) {
+    openScopeModal("delete", primaryId, occDate);
+  } else {
+    if (confirm("Delete this event?")) deleteEvent(primaryId, occDate, "all");
+  }
+}
+
+async function deleteEvent(primaryId, occDate, scope) {
+  const now = new Date().toISOString();
+  const primary = localEvents.find(e => e.id === primaryId);
+  if (!primary) return;
+
+  if (scope === "all" || !primary.recurrence) {
+    await db(`DELETE FROM events WHERE id=? OR recurring_event_id=?`, [primaryId, primaryId]);
+  } else if (scope === "this") {
+    // Insert a cancelled exception
+    const existing = localEvents.find(e => e.recurring_event_id === primaryId && e.original_date === occDate);
+    if (existing) {
+      await db(`UPDATE events SET is_cancelled=1,updated_at=? WHERE id=?`, [now, existing.id]);
+    } else {
+      const exId = crypto.randomUUID();
+      await db(`INSERT INTO events (id,title,description,location,start_date,start_time,end_date,end_time,all_day,color,organizer_id,attendee_ids,recurring_event_id,original_date,is_cancelled,source,created_by,created_at,updated_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,'local',?,?,?)`,
+        [exId,primary.title,primary.description,primary.location,occDate,primary.start_time,occDate,primary.end_time,primary.all_day,primary.color,ME?.id??null,"[]",primaryId,occDate,ME?.id??null,now,now]);
+    }
+  } else if (scope === "following") {
+    const rule = JSON.parse(primary.recurrence ?? "{}");
+    rule.end_date = addDayStr(occDate, -1);
+    rule.end_type = "date";
+    await db(`UPDATE events SET recurrence=?,updated_at=? WHERE id=?`, [JSON.stringify(rule), now, primaryId]);
+    // Delete any exceptions on or after occDate
+    await db(`DELETE FROM events WHERE recurring_event_id=? AND original_date>=?`, [primaryId, occDate]);
+  }
+
+  await loadLocalEvents(); closeModal(); render();
+}
+
+// ─── Scope picker modal ───────────────────────────────────────────────────
+function openScopeModal(action, primaryId, occDate) {
+  const isEdit   = action === "edit";
+  const primary  = localEvents.find(e => e.id === primaryId);
+  const scopeOpts = [
+    { scope: "this",      icon: "📌", label: "This event",               desc: `Only ${fmtDateShort(occDate)}` },
+    { scope: "following", icon: "➡️", label: "This and following events", desc: `From ${fmtDateShort(occDate)} onwards` },
+    { scope: "all",       icon: "🔁", label: "All events",               desc: `Every occurrence in the series` },
+  ];
+
+  openModal(`
+    <div class="modal-header">
+      <h3>${isEdit ? "Edit recurring event" : "Delete recurring event"}</h3>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal()">✕</button>
+    </div>
+    <p style="font-size:.85rem;color:var(--muted);margin-bottom:14px">Which events do you want to ${isEdit ? "edit" : "delete"}?</p>
+    ${scopeOpts.map(o => `
+      <div class="scope-option" onclick="${isEdit ? `closeModal();openDirectEdit_('${primaryId}','${o.scope}','${occDate}')` : `closeModal();deleteEvent('${primaryId}','${occDate}','${o.scope}')`}">
+        <span class="scope-icon">${o.icon}</span>
+        <div><div class="scope-label">${o.label}</div><div class="scope-desc">${o.desc}</div></div>
+      </div>`).join("")}
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+    </div>`);
+}
+
+window.openDirectEdit_ = function(primaryId, scope, occDate) {
+  const primary = localEvents.find(e => e.id === primaryId);
+  if (primary) openDirectEdit(primary, scope, occDate);
+};
+window.openEditModal    = openEditModal;
+window.confirmDelete    = confirmDelete;
+window.deleteEvent      = deleteEvent;
+
+// ─── Modal ────────────────────────────────────────────────────────────────
+function openModal(html) {
+  closeModal();
+  modalEl = document.createElement("div");
+  modalEl.className = "modal-backdrop";
+  modalEl.innerHTML = `<div class="modal">${html}</div>`;
+  modalEl.addEventListener("click", e => { if (e.target === modalEl) closeModal(); });
+  document.body.appendChild(modalEl);
+}
+function closeModal() { modalEl?.remove(); modalEl = null; }
+
+// ─── Navigation ───────────────────────────────────────────────────────────
+function prevPeriod() {
+  if (viewMode === "month") pivot.setMonth(pivot.getMonth() - 1);
+  else pivot.setDate(pivot.getDate() - 30);
+  render();
+}
+function nextPeriod() {
+  if (viewMode === "month") pivot.setMonth(pivot.getMonth() + 1);
+  else pivot.setDate(pivot.getDate() + 30);
+  render();
+}
+function goToday() { pivot = new Date(); render(); }
+function setView(v) { viewMode = v; render(); }
+
+window.prevPeriod     = prevPeriod;
+window.nextPeriod     = nextPeriod;
+window.goToday        = goToday;
+window.setView        = setView;
+window.openCreateModal = openCreateModal;
+window.openDayPanel   = openDayPanel;
+window.showEvent      = showEvent;
+window.closeModal     = closeModal;
+window.closePanels    = closePanels;
+
+// ─── Init ─────────────────────────────────────────────────────────────────
+(async () => {
+  if (CONTEXT) {
+    try {
+      const res = await fetch(`${CONTEXT}?keys=family.members`);
+      members = ((await res.json())["family.members"]) ?? [];
+    } catch { members = []; }
+  }
+  if (DB) {
+    await initDb();
+    await loadLocalEvents();
+  }
+  await loadSyncedEvents();
+  render();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+{
+  "id": "calendar",
+  "name": "Calendar",
+  "version": "1.0.0",
+  "description": "Family calendar with manual event creation, recurring events, and series editing. Shows month and agenda views. Merges in events synced from Google Calendar and Apple Calendar.",
+  "entrypoint": "index.html",
+  "runtime": "static",
+  "category": "productivity",
+  "tags": ["calendar", "events", "scheduling", "recurrence", "google", "apple"],
+  "data_access": {
+    "reads": ["family.members", "family.calendar"],
+    "writes": []
+  },
+  "permissions": {
+    "default_audience": "everyone",
+    "requires_approval": false
+  },
+  "storage": "db",
+  "nav": { "label": "Calendar", "icon": "📅" },
+  "widget": { "label": "Calendar", "size": "small" },
+  "resource_limits": {
+    "max_db_bytes": 104857600
+  }
+}
