@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Calendar Widget</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--hub-font, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+      font-size: 13px;
+      background: #fff;
+      color: #111827;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 14px 8px; border-bottom: 1px solid #e5e7eb; flex-shrink: 0;
+    }
+    .header-title { font-weight: 600; font-size: 13px; }
+    .header-date  { font-size: 11px; color: #6b7280; }
+
+    .event-list { flex: 1; overflow-y: auto; }
+
+    .day-label {
+      font-size: 10px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .05em; color: #9ca3af;
+      padding: 6px 14px 2px;
+    }
+
+    .event-row {
+      display: flex; align-items: center; gap: 8px;
+      padding: 5px 14px; border-bottom: 1px solid #f3f4f6;
+    }
+    .event-row:last-child { border-bottom: none; }
+
+    .event-dot {
+      width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+    }
+
+    .event-info { flex: 1; min-width: 0; }
+    .event-title {
+      font-size: 12.5px; font-weight: 500;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .event-time { font-size: 11px; color: #6b7280; margin-top: 1px; }
+
+    .footer {
+      padding: 6px 14px; border-top: 1px solid #e5e7eb;
+      display: flex; align-items: center; justify-content: flex-end;
+      flex-shrink: 0; background: #f9fafb;
+    }
+    .open-link { font-size: 11px; font-weight: 600; color: #111827; text-decoration: none; }
+    .open-link:hover { text-decoration: underline; }
+
+    .empty {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      color: #9ca3af; font-size: 12px; gap: 6px;
+    }
+  </style>
+</head>
+<body>
+<script type="module">
+const DB     = window.__DB_URL ?? "";
+const APP_ID = "calendar";
+const TODAY  = new Date().toISOString().slice(0, 10);
+
+function esc(s) {
+  return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+async function dbq(sql, params = []) {
+  if (!DB) return { rows: [] };
+  const res = await fetch(DB, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ sql, params }),
+  });
+  return res.json();
+}
+
+function fmtTime(t) {
+  if (!t) return "All day";
+  const [h, m] = t.split(":").map(Number);
+  const ampm = h >= 12 ? "pm" : "am";
+  const hr = h % 12 || 12;
+  return m === 0 ? `${hr}${ampm}` : `${hr}:${String(m).padStart(2,"0")}${ampm}`;
+}
+
+function fmtDay(dateStr) {
+  const d = new Date(dateStr + "T00:00:00");
+  if (dateStr === TODAY) return "Today";
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  if (dateStr === tomorrow.toISOString().slice(0,10)) return "Tomorrow";
+  return d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+}
+
+async function load() {
+  // Get today's events plus next upcoming events (limit to avoid clutter)
+  const { rows } = await dbq(
+    `SELECT id, title, start_date, start_time, all_day, color
+     FROM events
+     WHERE start_date >= ? AND is_cancelled = 0
+     ORDER BY start_date ASC, CASE WHEN start_time IS NULL THEN 0 ELSE 1 END, start_time ASC
+     LIMIT 15`,
+    [TODAY]
+  );
+
+  // Show today's events + up to 3 future days that have events, capped at 10 rows total
+  const groups = new Map();
+  for (const r of rows) {
+    if (!groups.has(r.start_date)) groups.set(r.start_date, []);
+    groups.get(r.start_date).push(r);
+  }
+
+  // Keep today + next 3 non-empty days
+  const days = [...groups.keys()].slice(0, 4);
+
+  const dateStr = new Date().toLocaleDateString(undefined, { month: "short", day: "numeric" });
+
+  const header = `
+    <div class="header">
+      <span class="header-title">Calendar</span>
+      <span class="header-date">${dateStr}</span>
+    </div>`;
+
+  let body;
+  if (days.length === 0) {
+    body = `<div class="empty">
+      <span>No upcoming events</span>
+      <a href="/open/${APP_ID}" onclick="window.__HUB_OPEN && (event.preventDefault(), window.__HUB_OPEN('${APP_ID}'))" style="color:#111827;font-weight:600;font-size:11px">Open Calendar →</a>
+    </div>`;
+  } else {
+    const parts = [];
+    for (const day of days) {
+      parts.push(`<div class="day-label">${fmtDay(day)}</div>`);
+      for (const ev of groups.get(day)) {
+        const dot = ev.color ?? "#0f766e";
+        const time = ev.all_day ? "All day" : fmtTime(ev.start_time);
+        parts.push(`<div class="event-row">
+          <div class="event-dot" style="background:${esc(dot)}"></div>
+          <div class="event-info">
+            <div class="event-title">${esc(ev.title)}</div>
+            <div class="event-time">${time}</div>
+          </div>
+        </div>`);
+      }
+    }
+    body = `<div class="event-list">${parts.join("")}</div>`;
+  }
+
+  const footer = `
+    <div class="footer">
+      <a class="open-link" href="/open/${APP_ID}" onclick="window.__HUB_OPEN && (event.preventDefault(), window.__HUB_OPEN('${APP_ID}'))">Full calendar →</a>
+    </div>`;
+
+  document.body.innerHTML = header + body + footer;
+}
+
+load().catch(() => {
+  document.body.innerHTML = `<div class="empty"><a href="/open/${APP_ID}" style="color:#111827;font-weight:600">Open Calendar →</a></div>`;
+});
+</script>
+</body>
+</html>
