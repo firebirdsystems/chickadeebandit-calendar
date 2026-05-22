@@ -450,7 +450,8 @@ async function db(sql, params = []) {
   return res.json();
 }
 async function initDb() {
-  // Schema is managed by hub migrations (migrations/001_init.sql)}
+  // Schema is managed by hub migrations (migrations/001_init.sql)
+}
 async function loadLocalEvents() {
   const { rows } = await db(`SELECT * FROM events WHERE source = 'local' ORDER BY start_date, start_time`);
   localEvents = rows ?? [];
