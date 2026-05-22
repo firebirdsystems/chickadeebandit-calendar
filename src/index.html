@@ -370,7 +370,7 @@
 </div>
 
 <script type="module">
-import { memberColor, initial, esc, isAdult } from "/hub-sdk.js";
+import { memberColor, initial, esc, isAdult, hubConfirm } from "/hub-sdk.js";
 
 const CONTEXT = window.__CONTEXT_URL ?? "";
 const DB      = window.__DB_URL      ?? "";
@@ -1031,9 +1031,9 @@ window.submitEdit = async function(primaryId, scope, occDate) {
 };
 
 // ─── Delete ───────────────────────────────────────────────────────────────
-function confirmDelete(primaryId, occDate, isRecurring) {
+async function confirmDelete(primaryId, occDate, isRecurring) {
   if (isRecurring) openScopeModal("delete", primaryId, occDate);
-  else if (confirm("Delete this event?")) deleteEvent(primaryId, occDate, "all");
+  else if (await hubConfirm({ message: "Delete this event?", confirmLabel: "Delete", destructive: true })) deleteEvent(primaryId, occDate, "all");
 }
 async function deleteEvent(primaryId, occDate, scope) {
   const now = new Date().toISOString();
