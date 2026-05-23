@@ -371,6 +371,13 @@
 
 <script type="module">
 import { memberColor, initial, esc, isAdult, hubConfirm } from "/hub-sdk.js";
+import {
+  MONTHS, MONTHS_SHORT, DAYS_SHORT, DAYS_ABBR, DAY_NAMES, EVENT_COLORS,
+  p2, toDateStr, parseLD, addDaysObj, addDayStr, todayStr, daysBetween, getWeekStart,
+  timeToMins, fmtTime, fmtDate, fmtDateShort,
+  normalizeDate, normalizeTime,
+  describeRecurrence, advanceCursor,
+} from "./logic.js";
 
 const CONTEXT = window.__CONTEXT_URL ?? "";
 const DB      = window.__DB_URL      ?? "";
@@ -385,63 +392,8 @@ let pivot        = new Date();
 let modalEl      = null;
 let panelEl      = null;
 
-// ─── Date utilities ───────────────────────────────────────────────────────
-const toDateStr  = d => `${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`;
-const p2         = n => String(n).padStart(2,"0");
-const parseLD    = s => { const [y,m,d] = s.split("-").map(Number); return new Date(y,m-1,d); };
-const addDaysObj = (d,n) => { const r = new Date(d); r.setDate(r.getDate()+n); return r; };
-const addDayStr  = (s,n) => toDateStr(addDaysObj(parseLD(s),n));
-const todayStr   = () => toDateStr(new Date());
-const daysBetween= (a,b) => Math.round((parseLD(b)-parseLD(a))/86400000);
-
-const MONTHS      = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-const MONTHS_SHORT= ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-const DAYS_SHORT  = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
-const DAYS_ABBR   = ["Su","Mo","Tu","We","Th","Fr","Sa"];
-const DAY_NAMES   = ["sun","mon","tue","wed","thu","fri","sat"];
-const EVENT_COLORS= ["#0f766e","#4f46e5","#0891b2","#16a34a","#d97706","#dc2626","#7c3aed","#db2777"];
-
 const HOUR_H = 56; // px per hour in time grid
 
-function fmtTime(t) {
-  if (!t) return "";
-  const [h,m] = t.split(":").map(Number);
-  const ampm = h < 12 ? "AM" : "PM";
-  const hr = h % 12 || 12;
-  return m === 0 ? `${hr} ${ampm}` : `${hr}:${p2(m)} ${ampm}`;
-}
-function fmtDate(s, { weekday = false } = {}) {
-  const d = parseLD(s);
-  const opts = { month: "short", day: "numeric", year: "numeric" };
-  if (weekday) opts.weekday = "long";
-  return d.toLocaleDateString("en-US", opts);
-}
-function fmtDateShort(s) {
-  return parseLD(s).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
-function timeToMins(t) {
-  if (!t) return null;
-  const [h,m] = t.split(":").map(Number);
-  return h * 60 + m;
-}
-function getWeekStart(d) {
-  const r = new Date(d);
-  r.setDate(r.getDate() - ((r.getDay() + 6) % 7)); // Monday
-  return r;
-}
-function describeRecurrence(rule) {
-  if (!rule) return "";
-  const { freq, interval = 1, days } = rule;
-  const n = interval === 1 ? "" : `${interval} `;
-  if (freq === "daily")   return interval === 1 ? "Daily" : `Every ${interval} days`;
-  if (freq === "weekly") {
-    const dayStr = days?.length ? days.map(d => d[0].toUpperCase() + d[1]).join(", ") : "";
-    return interval === 1 ? `Weekly${dayStr ? " on " + dayStr : ""}` : `Every ${n}weeks${dayStr ? " on " + dayStr : ""}`;
-  }
-  if (freq === "monthly") return interval === 1 ? "Monthly" : `Every ${n}months`;
-  if (freq === "yearly")  return interval === 1 ? "Yearly"  : `Every ${n}years`;
-  return "";
-}
 
 // ─── DB ───────────────────────────────────────────────────────────────────
 async function db(sql, params = []) {
@@ -473,17 +425,6 @@ async function loadSyncedEvents() {
       attendee_ids: "[]", source: "synced",
     }));
   } catch { syncedEvents = []; }
-}
-function normalizeDate(iso) {
-  if (!iso) return todayStr();
-  return iso.includes("T") ? iso.split("T")[0] : iso.slice(0,10);
-}
-function normalizeTime(iso) {
-  if (!iso || !iso.includes("T")) return null;
-  const t = iso.split("T")[1];
-  if (!t) return null;
-  const [h,m] = t.split(":");
-  return `${h}:${m}`;
 }
 
 // ─── Recurrence expansion ─────────────────────────────────────────────────
@@ -545,22 +486,6 @@ function occurrencesInRange(startDate, rule, rangeStart, rangeEnd) {
     cursor = advanceCursor(cursor, rule);
   }
   return results;
-}
-function advanceCursor(d, rule) {
-  const next = new Date(d);
-  const { freq, interval: iv = 1, days } = rule;
-  if (freq === "daily") { next.setDate(next.getDate() + iv); }
-  else if (freq === "weekly") {
-    if (days?.length > 1) {
-      const sel = days.map(x => DAY_NAMES.indexOf(x)).filter(x => x >= 0).sort((a,b) => a-b);
-      const cur = next.getDay();
-      const nxt = sel.find(x => x > cur);
-      if (nxt != null) next.setDate(next.getDate() + (nxt - cur));
-      else next.setDate(next.getDate() + (7 * iv - cur + sel[0]));
-    } else { next.setDate(next.getDate() + 7 * iv); }
-  } else if (freq === "monthly") { next.setMonth(next.getMonth() + iv); }
-  else if (freq === "yearly")  { next.setFullYear(next.getFullYear() + iv); }
-  return next;
 }
 
 // ─── Render main ──────────────────────────────────────────────────────────
@@ -971,6 +896,8 @@ function openCreateModal(defaultDate = null) {
 window.submitCreate = async function() {
   const data = collectFormData();
   if (!data.title) { document.getElementById("ef-title").focus(); return; }
+  const btn = modalEl?.querySelector('.modal-actions .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
   const id = crypto.randomUUID(), now = new Date().toISOString();
   await db(`INSERT INTO events (id,title,description,location,start_date,start_time,end_date,end_time,all_day,color,organizer_id,attendee_ids,recurrence,source,created_by,created_at,updated_at)
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'local',?,?,?)`,
@@ -999,6 +926,8 @@ function openDirectEdit(ev, scope, occDate) {
 window.submitEdit = async function(primaryId, scope, occDate) {
   const data = collectFormData();
   if (!data.title) { document.getElementById("ef-title").focus(); return; }
+  const btn = modalEl?.querySelector('.modal-actions .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
   const now = new Date().toISOString();
   const primary = localEvents.find(e => e.id === primaryId);
   if (!primary) return;
