@@ -5,7 +5,7 @@
   "description": "Family calendar with manual event creation, recurring events, and series editing. Shows month and agenda views. Merges in events synced from Google Calendar and Apple Calendar.",
   "entrypoint": "index.html",
   "runtime": "static",
-  "category": "productivity",
+  "category": "general",
   "tags": [
     "calendar",
     "events",
