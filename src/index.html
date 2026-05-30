@@ -1057,6 +1057,14 @@ window.showEvent       = showEvent;
 window.closeModal      = closeModal;
 window.closePanels     = closePanels;
 
+// ─── Deep link ────────────────────────────────────────────────────────────
+function handleDeepLink() {
+  const eventId = new URLSearchParams(window.location.search).get("eventId");
+  if (!eventId) return;
+  const ev = localEvents.find(e => e.id === eventId) ?? syncedEvents.find(e => e.id === eventId);
+  if (ev) showEvent(ev.id, ev.start_date, ev._primaryId ?? ev.id, ev._occDate ?? ev.start_date);
+}
+
 // ─── Init ─────────────────────────────────────────────────────────────────
 (async () => {
   if (CONTEXT) {
@@ -1068,6 +1076,7 @@ window.closePanels     = closePanels;
   if (DB) { await initDb(); await loadLocalEvents(); }
   await loadSyncedEvents();
   render();
+  handleDeepLink();
 })();
 </script>
 </body>
