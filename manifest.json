@@ -40,6 +40,8 @@
   "ai_access": {
     "allowed": true,
     "mode": "read_write",
+    "db_exports": ["upcoming_events", "events_this_week"],
+    "db_mutations": ["cancel_event", "reschedule_event"],
     "db_inserts": ["add_event"]
   }
 }
