@@ -411,10 +411,11 @@ async function loadLocalEvents() {
 async function loadSyncedEvents() {
   if (!CONTEXT) return;
   try {
-    const res  = await fetch(`${CONTEXT}?keys=family.calendar`);
+    const res  = await fetch(`${CONTEXT}?keys=family.calendar,app.agenda.meetings`);
     const data = await res.json();
     const raw  = data["family.calendar"] ?? [];
-    syncedEvents = raw.map(ev => ({
+    const agendaRaw = data["app.agenda.meetings"] ?? [];
+    const normalize = ev => ({
       id: ev.id ?? crypto.randomUUID(), title: ev.title ?? ev.summary ?? "Event",
       description: ev.description ?? "", location: ev.location ?? "",
       start_date: normalizeDate(ev.start_at ?? ev.start_date ?? ev.date),
@@ -423,7 +424,8 @@ async function loadSyncedEvents() {
       end_time: normalizeTime(ev.end_at), all_day: ev.all_day ? 1 : 0,
       color: "#6b7280", organizer_id: ev.family_member_id ?? null,
       attendee_ids: "[]", source: "synced",
-    }));
+    });
+    syncedEvents = [...raw.map(normalize), ...agendaRaw.map(normalize)];
   } catch { syncedEvents = []; }
 }
 
