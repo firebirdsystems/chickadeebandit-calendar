@@ -1032,21 +1032,26 @@ function openModal(html) {
 function closeModal() { modalEl?.remove(); modalEl = null; }
 
 // ─── Navigation ───────────────────────────────────────────────────────────
+function refreshSyncedAndRender() {
+  render();
+  loadSyncedEvents().then(() => render()).catch(() => {});
+}
+
 function prevPeriod() {
   if (viewMode === "month")  pivot.setMonth(pivot.getMonth() - 1);
   else if (viewMode === "week")  pivot.setDate(pivot.getDate() - 7);
   else if (viewMode === "day")   pivot.setDate(pivot.getDate() - 1);
   else pivot.setDate(pivot.getDate() - 30);
-  render();
+  refreshSyncedAndRender();
 }
 function nextPeriod() {
   if (viewMode === "month")  pivot.setMonth(pivot.getMonth() + 1);
   else if (viewMode === "week")  pivot.setDate(pivot.getDate() + 7);
   else if (viewMode === "day")   pivot.setDate(pivot.getDate() + 1);
   else pivot.setDate(pivot.getDate() + 30);
-  render();
+  refreshSyncedAndRender();
 }
-function goToday() { pivot = new Date(); render(); }
+function goToday() { pivot = new Date(); refreshSyncedAndRender(); }
 function setView(v) { viewMode = v; render(); }
 
 window.prevPeriod      = prevPeriod;
