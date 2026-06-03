@@ -910,14 +910,26 @@ function openCreateModal(defaultDate = null) {
 window.submitCreate = async function() {
   const data = collectFormData();
   if (!data.title) { document.getElementById("ef-title").focus(); return; }
-  const btn = modalEl?.querySelector('.modal-actions .btn-primary');
-  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
   const id = crypto.randomUUID(), now = new Date().toISOString();
-  await db(`INSERT INTO events (id,title,description,location,start_date,start_time,end_date,end_time,all_day,color,organizer_id,attendee_ids,recurrence,source,created_by,created_at,updated_at)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'local',?,?,?)`,
-    [id, data.title, data.description, data.location, data.start_date, data.start_time, data.end_date, data.end_time,
-     data.all_day, data.color, ME?.id ?? null, data.attendee_ids, data.recurrence, ME?.id ?? null, now, now]);
-  await loadLocalEvents(); closeModal(); render();
+  localEvents.push({
+    id, ...data, source: "local",
+    organizer_id: ME?.id ?? null, created_by: ME?.id ?? null,
+    created_at: now, updated_at: now,
+    recurring_event_id: null, original_date: null, is_cancelled: 0,
+  });
+  closeModal();
+  render();
+  try {
+    await db(
+      `INSERT INTO events (id,title,description,location,start_date,start_time,end_date,end_time,all_day,color,organizer_id,attendee_ids,recurrence,source,created_by,created_at,updated_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'local',?,?,?)`,
+      [id, data.title, data.description, data.location, data.start_date, data.start_time, data.end_date, data.end_time,
+       data.all_day, data.color, ME?.id ?? null, data.attendee_ids, data.recurrence, ME?.id ?? null, now, now]
+    );
+  } catch {
+    localEvents = localEvents.filter(e => e.id !== id);
+    render();
+  }
 };
 
 // ─── Edit ─────────────────────────────────────────────────────────────────
@@ -940,15 +952,29 @@ function openDirectEdit(ev, scope, occDate) {
 window.submitEdit = async function(primaryId, scope, occDate) {
   const data = collectFormData();
   if (!data.title) { document.getElementById("ef-title").focus(); return; }
-  const btn = modalEl?.querySelector('.modal-actions .btn-primary');
-  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
   const now = new Date().toISOString();
   const primary = localEvents.find(e => e.id === primaryId);
   if (!primary) return;
+
   if (scope === "all" || !primary.recurrence) {
-    await db(`UPDATE events SET title=?,description=?,location=?,start_date=?,start_time=?,end_date=?,end_time=?,all_day=?,color=?,attendee_ids=?,recurrence=?,updated_at=? WHERE id=?`,
-      [data.title,data.description,data.location,data.start_date,data.start_time,data.end_date,data.end_time,data.all_day,data.color,data.attendee_ids,data.recurrence,now,primaryId]);
-  } else if (scope === "this") {
+    const prevEvents = [...localEvents];
+    localEvents = localEvents.map(e => e.id === primaryId ? { ...e, ...data, updated_at: now } : e);
+    closeModal();
+    render();
+    try {
+      await db(`UPDATE events SET title=?,description=?,location=?,start_date=?,start_time=?,end_date=?,end_time=?,all_day=?,color=?,attendee_ids=?,recurrence=?,updated_at=? WHERE id=?`,
+        [data.title,data.description,data.location,data.start_date,data.start_time,data.end_date,data.end_time,data.all_day,data.color,data.attendee_ids,data.recurrence,now,primaryId]);
+    } catch {
+      localEvents = prevEvents;
+      render();
+    }
+    return;
+  }
+
+  // Recurrence scopes — pessimistic (multi-step operations)
+  const btn = modalEl?.querySelector('.modal-actions .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+  if (scope === "this") {
     const existing = localEvents.find(e => e.recurring_event_id === primaryId && e.original_date === occDate);
     const durDays = daysBetween(primary.start_date, primary.end_date);
     const endDate = data.end_date !== occDate ? data.end_date : addDayStr(data.start_date, durDays);
@@ -964,11 +990,13 @@ window.submitEdit = async function(primaryId, scope, occDate) {
   } else if (scope === "following") {
     const rule = JSON.parse(primary.recurrence ?? "{}");
     rule.end_date = addDayStr(occDate, -1);
-    await db(`UPDATE events SET recurrence=?,updated_at=? WHERE id=?`, [JSON.stringify(rule),now,primaryId]);
     const newId = crypto.randomUUID();
-    await db(`INSERT INTO events (id,title,description,location,start_date,start_time,end_date,end_time,all_day,color,organizer_id,attendee_ids,recurrence,source,created_by,created_at,updated_at)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'local',?,?,?)`,
-      [newId,data.title,data.description,data.location,occDate,data.start_time,occDate,data.end_time,data.all_day,data.color,ME?.id??null,data.attendee_ids,data.recurrence,ME?.id??null,now,now]);
+    await Promise.all([
+      db(`UPDATE events SET recurrence=?,updated_at=? WHERE id=?`, [JSON.stringify(rule),now,primaryId]),
+      db(`INSERT INTO events (id,title,description,location,start_date,start_time,end_date,end_time,all_day,color,organizer_id,attendee_ids,recurrence,source,created_by,created_at,updated_at)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'local',?,?,?)`,
+        [newId,data.title,data.description,data.location,occDate,data.start_time,occDate,data.end_time,data.all_day,data.color,ME?.id??null,data.attendee_ids,data.recurrence,ME?.id??null,now,now]),
+    ]);
   }
   await loadLocalEvents(); closeModal(); render();
 };
@@ -979,19 +1007,38 @@ async function confirmDelete(primaryId, occDate, isRecurring) {
   else if (await hubConfirm({ message: "Delete this event?", confirmLabel: "Delete", destructive: true })) deleteEvent(primaryId, occDate, "all");
 }
 async function hideEvent(id) {
-  const now = new Date().toISOString();
-  await db(`INSERT INTO hidden_synced_events (event_id, hidden_at) VALUES (?,?) ON CONFLICT DO NOTHING`, [id, now]);
+  const prev = [...syncedEvents];
+  syncedEvents = syncedEvents.filter(e => e.id !== id);
   closeModal();
-  await loadSyncedEvents();
   render();
+  try {
+    const now = new Date().toISOString();
+    await db(`INSERT INTO hidden_synced_events (event_id, hidden_at) VALUES (?,?) ON CONFLICT DO NOTHING`, [id, now]);
+  } catch {
+    syncedEvents = prev;
+    render();
+  }
 }
 async function deleteEvent(primaryId, occDate, scope) {
   const now = new Date().toISOString();
   const primary = localEvents.find(e => e.id === primaryId);
   if (!primary) return;
+
   if (scope === "all" || !primary.recurrence) {
-    await db(`DELETE FROM events WHERE id=? OR recurring_event_id=?`, [primaryId, primaryId]);
-  } else if (scope === "this") {
+    const prevEvents = [...localEvents];
+    localEvents = localEvents.filter(e => e.id !== primaryId && e.recurring_event_id !== primaryId);
+    closeModal();
+    render();
+    try {
+      await db(`DELETE FROM events WHERE id=? OR recurring_event_id=?`, [primaryId, primaryId]);
+    } catch {
+      localEvents = prevEvents;
+      render();
+    }
+    return;
+  }
+
+  if (scope === "this") {
     const existing = localEvents.find(e => e.recurring_event_id === primaryId && e.original_date === occDate);
     if (existing) {
       await db(`UPDATE events SET is_cancelled=1,updated_at=? WHERE id=?`, [now, existing.id]);
@@ -1004,8 +1051,10 @@ async function deleteEvent(primaryId, occDate, scope) {
   } else if (scope === "following") {
     const rule = JSON.parse(primary.recurrence ?? "{}");
     rule.end_date = addDayStr(occDate, -1); rule.end_type = "date";
-    await db(`UPDATE events SET recurrence=?,updated_at=? WHERE id=?`, [JSON.stringify(rule), now, primaryId]);
-    await db(`DELETE FROM events WHERE recurring_event_id=? AND original_date>=?`, [primaryId, occDate]);
+    await Promise.all([
+      db(`UPDATE events SET recurrence=?,updated_at=? WHERE id=?`, [JSON.stringify(rule), now, primaryId]),
+      db(`DELETE FROM events WHERE recurring_event_id=? AND original_date>=?`, [primaryId, occDate]),
+    ]);
   }
   await loadLocalEvents(); closeModal(); render();
 }
@@ -1093,14 +1142,18 @@ function handleDeepLink() {
 
 // ─── Init ─────────────────────────────────────────────────────────────────
 (async () => {
-  if (CONTEXT) {
+  async function fetchMembers() {
+    if (!CONTEXT) return;
     try {
       const res = await fetch(`${CONTEXT}?keys=family.members`);
       members = ((await res.json())["family.members"]) ?? [];
     } catch { members = []; }
   }
-  if (DB) { await initDb(); await loadLocalEvents(); }
-  await loadSyncedEvents();
+  await Promise.all([
+    fetchMembers(),
+    (async () => { if (DB) { await initDb(); await loadLocalEvents(); } })(),
+    loadSyncedEvents(),
+  ]);
   render();
   handleDeepLink();
 })();
