@@ -18,7 +18,7 @@
     "reads": [
       "family.members",
       "family.calendar",
-      "app.agenda.meetings"
+      "cross.calendar_events"
     ],
     "writes": []
   },
