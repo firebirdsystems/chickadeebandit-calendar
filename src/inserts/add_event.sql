@@ -1,6 +1,5 @@
-INSERT INTO events (
+INSERT INTO app_calendar__events (
   id,
-  household_id,
   title,
   description,
   location,
@@ -16,8 +15,7 @@ INSERT INTO events (
   created_at,
   updated_at
 ) VALUES (
-  gen_random_uuid()::text,
-  current_setting('app.household_id', true)::uuid,
+  gen_random_uuid(),
   $1,
   COALESCE($5, ''),
   '',
@@ -30,6 +28,6 @@ INSERT INTO events (
   '[]',
   'local',
   'ai',
-  NOW()::text,
-  NOW()::text
+  datetime('now'),
+  datetime('now')
 )

@@ -13,9 +13,8 @@ SELECT
   attendee_ids,
   source,
   created_by
-FROM events
-WHERE household_id = current_setting('app.household_id', true)::uuid
-  AND is_cancelled  = 0
-  AND end_date     >= CURRENT_DATE::text
+FROM app_calendar__events
+WHERE is_cancelled  = 0
+  AND end_date     >= CURRENT_DATE
 ORDER BY start_date, start_time NULLS FIRST
 LIMIT 100

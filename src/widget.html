@@ -106,7 +106,7 @@ async function load() {
   // Get today's events plus next upcoming events (limit to avoid clutter)
   const { rows } = await dbq(
     `SELECT id, title, start_date, start_time, all_day, color
-     FROM events
+     FROM app_calendar__events
      WHERE start_date >= ? AND is_cancelled = 0
      ORDER BY start_date ASC, CASE WHEN start_time IS NULL THEN 0 ELSE 1 END, start_time ASC
      LIMIT 15`,

@@ -1,5 +1,4 @@
-CREATE TABLE IF NOT EXISTS events (
-  household_id       UUID NOT NULL DEFAULT current_setting('app.household_id', true)::uuid,
+CREATE TABLE IF NOT EXISTS app_calendar__events (
   id                 TEXT NOT NULL,
   title              TEXT NOT NULL,
   description        TEXT NOT NULL DEFAULT '',
@@ -20,5 +19,11 @@ CREATE TABLE IF NOT EXISTS events (
   created_by         TEXT,
   created_at         TEXT NOT NULL,
   updated_at         TEXT NOT NULL,
-  PRIMARY KEY (household_id, id)
+  PRIMARY KEY (id)
+);
+
+CREATE TABLE IF NOT EXISTS app_calendar__hidden_synced_events (
+  event_id     TEXT    NOT NULL,
+  hidden_at    TEXT    NOT NULL,
+  PRIMARY KEY (event_id)
 );

@@ -8,10 +8,9 @@ SELECT
   location,
   organizer_id,
   attendee_ids
-FROM events
-WHERE household_id = current_setting('app.household_id', true)::uuid
-  AND is_cancelled  = 0
-  AND start_date   >= CURRENT_DATE::text
-  AND start_date   <= (CURRENT_DATE + 7)::text
+FROM app_calendar__events
+WHERE is_cancelled  = 0
+  AND start_date   >= CURRENT_DATE
+  AND start_date   <= date('now', '+7 days')
 ORDER BY start_date, start_time NULLS FIRST
 LIMIT 50

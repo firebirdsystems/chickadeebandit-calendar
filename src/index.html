@@ -407,7 +407,7 @@ async function initDb() {
   // Schema is managed by hub migrations (migrations/001_init.sql)
 }
 async function loadLocalEvents() {
-  const { rows } = await db(`SELECT * FROM events WHERE source = 'local' ORDER BY start_date, start_time`);
+  const { rows } = await db(`SELECT * FROM app_calendar__events WHERE source = 'local' ORDER BY start_date, start_time`);
   localEvents = rows ?? [];
 }
 async function loadSyncedEvents() {
@@ -428,7 +428,7 @@ async function loadSyncedEvents() {
       calendar_name: ev.calendarName ?? ev.calendar_name ?? null,
       attendee_ids: ev.member_ids ? JSON.stringify(ev.member_ids) : "[]",
     });
-    const { rows: hidden } = await db(`SELECT event_id FROM hidden_synced_events`);
+    const { rows: hidden } = await db(`SELECT event_id FROM app_calendar__hidden_synced_events`);
     const hiddenIds = new Set((hidden ?? []).map(r => r.event_id));
     const allSynced = [
       ...raw.map(ev => ({ ...normalizeBase(ev), source: "synced" })),
@@ -921,7 +921,7 @@ window.submitCreate = async function() {
   render();
   try {
     await db(
-      `INSERT INTO events (id,title,description,location,start_date,start_time,end_date,end_time,all_day,color,organizer_id,attendee_ids,recurrence,source,created_by,created_at,updated_at)
+      `INSERT INTO app_calendar__events (id,title,description,location,start_date,start_time,end_date,end_time,all_day,color,organizer_id,attendee_ids,recurrence,source,created_by,created_at,updated_at)
        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'local',?,?,?)`,
       [id, data.title, data.description, data.location, data.start_date, data.start_time, data.end_date, data.end_time,
        data.all_day, data.color, ME?.id ?? null, data.attendee_ids, data.recurrence, ME?.id ?? null, now, now]
@@ -962,7 +962,7 @@ window.submitEdit = async function(primaryId, scope, occDate) {
     closeModal();
     render();
     try {
-      await db(`UPDATE events SET title=?,description=?,location=?,start_date=?,start_time=?,end_date=?,end_time=?,all_day=?,color=?,attendee_ids=?,recurrence=?,updated_at=? WHERE id=?`,
+      await db(`UPDATE app_calendar__events SET title=?,description=?,location=?,start_date=?,start_time=?,end_date=?,end_time=?,all_day=?,color=?,attendee_ids=?,recurrence=?,updated_at=? WHERE id=?`,
         [data.title,data.description,data.location,data.start_date,data.start_time,data.end_date,data.end_time,data.all_day,data.color,data.attendee_ids,data.recurrence,now,primaryId]);
     } catch {
       localEvents = prevEvents;
@@ -979,11 +979,11 @@ window.submitEdit = async function(primaryId, scope, occDate) {
     const durDays = daysBetween(primary.start_date, primary.end_date);
     const endDate = data.end_date !== occDate ? data.end_date : addDayStr(data.start_date, durDays);
     if (existing) {
-      await db(`UPDATE events SET title=?,description=?,location=?,start_date=?,start_time=?,end_date=?,end_time=?,all_day=?,color=?,attendee_ids=?,updated_at=? WHERE id=?`,
+      await db(`UPDATE app_calendar__events SET title=?,description=?,location=?,start_date=?,start_time=?,end_date=?,end_time=?,all_day=?,color=?,attendee_ids=?,updated_at=? WHERE id=?`,
         [data.title,data.description,data.location,data.start_date,data.start_time,endDate,data.end_time,data.all_day,data.color,data.attendee_ids,now,existing.id]);
     } else {
       const exId = crypto.randomUUID();
-      await db(`INSERT INTO events (id,title,description,location,start_date,start_time,end_date,end_time,all_day,color,organizer_id,attendee_ids,recurring_event_id,original_date,source,created_by,created_at,updated_at)
+      await db(`INSERT INTO app_calendar__events (id,title,description,location,start_date,start_time,end_date,end_time,all_day,color,organizer_id,attendee_ids,recurring_event_id,original_date,source,created_by,created_at,updated_at)
         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,'local',?,?,?)`,
         [exId,data.title,data.description,data.location,data.start_date,data.start_time,endDate,data.end_time,data.all_day,data.color,ME?.id??null,data.attendee_ids,primaryId,occDate,ME?.id??null,now,now]);
     }
@@ -992,8 +992,8 @@ window.submitEdit = async function(primaryId, scope, occDate) {
     rule.end_date = addDayStr(occDate, -1);
     const newId = crypto.randomUUID();
     await Promise.all([
-      db(`UPDATE events SET recurrence=?,updated_at=? WHERE id=?`, [JSON.stringify(rule),now,primaryId]),
-      db(`INSERT INTO events (id,title,description,location,start_date,start_time,end_date,end_time,all_day,color,organizer_id,attendee_ids,recurrence,source,created_by,created_at,updated_at)
+      db(`UPDATE app_calendar__events SET recurrence=?,updated_at=? WHERE id=?`, [JSON.stringify(rule),now,primaryId]),
+      db(`INSERT INTO app_calendar__events (id,title,description,location,start_date,start_time,end_date,end_time,all_day,color,organizer_id,attendee_ids,recurrence,source,created_by,created_at,updated_at)
          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'local',?,?,?)`,
         [newId,data.title,data.description,data.location,occDate,data.start_time,occDate,data.end_time,data.all_day,data.color,ME?.id??null,data.attendee_ids,data.recurrence,ME?.id??null,now,now]),
     ]);
@@ -1013,7 +1013,7 @@ async function hideEvent(id) {
   render();
   try {
     const now = new Date().toISOString();
-    await db(`INSERT INTO hidden_synced_events (event_id, hidden_at) VALUES (?,?) ON CONFLICT DO NOTHING`, [id, now]);
+    await db(`INSERT INTO app_calendar__hidden_synced_events (event_id, hidden_at) VALUES (?,?) ON CONFLICT DO NOTHING`, [id, now]);
   } catch {
     syncedEvents = prev;
     render();
@@ -1030,7 +1030,7 @@ async function deleteEvent(primaryId, occDate, scope) {
     closeModal();
     render();
     try {
-      await db(`DELETE FROM events WHERE id=? OR recurring_event_id=?`, [primaryId, primaryId]);
+      await db(`DELETE FROM app_calendar__events WHERE id=? OR recurring_event_id=?`, [primaryId, primaryId]);
     } catch {
       localEvents = prevEvents;
       render();
@@ -1041,10 +1041,10 @@ async function deleteEvent(primaryId, occDate, scope) {
   if (scope === "this") {
     const existing = localEvents.find(e => e.recurring_event_id === primaryId && e.original_date === occDate);
     if (existing) {
-      await db(`UPDATE events SET is_cancelled=1,updated_at=? WHERE id=?`, [now, existing.id]);
+      await db(`UPDATE app_calendar__events SET is_cancelled=1,updated_at=? WHERE id=?`, [now, existing.id]);
     } else {
       const exId = crypto.randomUUID();
-      await db(`INSERT INTO events (id,title,description,location,start_date,start_time,end_date,end_time,all_day,color,organizer_id,attendee_ids,recurring_event_id,original_date,is_cancelled,source,created_by,created_at,updated_at)
+      await db(`INSERT INTO app_calendar__events (id,title,description,location,start_date,start_time,end_date,end_time,all_day,color,organizer_id,attendee_ids,recurring_event_id,original_date,is_cancelled,source,created_by,created_at,updated_at)
         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,'local',?,?,?)`,
         [exId,primary.title,primary.description,primary.location,occDate,primary.start_time,occDate,primary.end_time,primary.all_day,primary.color,ME?.id??null,"[]",primaryId,occDate,ME?.id??null,now,now]);
     }
@@ -1052,8 +1052,8 @@ async function deleteEvent(primaryId, occDate, scope) {
     const rule = JSON.parse(primary.recurrence ?? "{}");
     rule.end_date = addDayStr(occDate, -1); rule.end_type = "date";
     await Promise.all([
-      db(`UPDATE events SET recurrence=?,updated_at=? WHERE id=?`, [JSON.stringify(rule), now, primaryId]),
-      db(`DELETE FROM events WHERE recurring_event_id=? AND original_date>=?`, [primaryId, occDate]),
+      db(`UPDATE app_calendar__events SET recurrence=?,updated_at=? WHERE id=?`, [JSON.stringify(rule), now, primaryId]),
+      db(`DELETE FROM app_calendar__events WHERE recurring_event_id=? AND original_date>=?`, [primaryId, occDate]),
     ]);
   }
   await loadLocalEvents(); closeModal(); render();
