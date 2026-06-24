@@ -15,7 +15,7 @@ INSERT INTO app_calendar__events (
   created_at,
   updated_at
 ) VALUES (
-  gen_random_uuid(),
+  lower(hex(randomblob(16))),
   $1,
   COALESCE($5, ''),
   '',
