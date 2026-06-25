@@ -522,7 +522,21 @@ function updateTitle() {
   if (btn) btn.classList.add("active");
 }
 
+// ─── Safe event registry ──────────────────────────────────────────────────
+// Event IDs from synced (external) calendars can contain single quotes and
+// other characters that would break out of JS string contexts in onclick="".
+// Instead of interpolating IDs into onclick strings, we register each event
+// object in a flat array and pass only its integer index to the handler.
+let _evReg = [];
+function _regEv(ev, ds) { _evReg.push({ ev, ds }); return _evReg.length - 1; }
+function _showEvByKey(k) {
+  const { ev, ds } = _evReg[k];
+  showEvent(ev.id, ds, ev._primaryId ?? ev.id, ev._occDate ?? ds);
+}
+function _hideEvByKey(k) { hideEvent(_evReg[k].ev.id); }
+
 function render() {
+  _evReg = [];
   updateTitle();
   if (viewMode === "month")  renderMonth();
   else if (viewMode === "week") renderWeek();
@@ -549,7 +563,7 @@ function renderMonth() {
     const pillsHtml = show.map(ev => {
       const timeStr = ev.all_day ? "" : `<span class="ev-time">${fmtTime(ev.start_time)}</span>`;
       return `<span class="ev-pill${ev.source==="synced"?" synced":ev.source==="cross-app"?" cross-app":""}" style="background:${ev.color}"
-        onclick="event.stopPropagation();showEvent('${ev.id}','${ds}','${ev._primaryId??ev.id}','${ev._occDate??ds}')"
+        onclick="event.stopPropagation();_showEvByKey(${_regEv(ev,ds)})"
         title="${esc(ev.title)}">${timeStr}${esc(ev.title)}</span>`;
     }).join("");
     const moreHtml = more > 0 ? `<div class="ev-more" onclick="event.stopPropagation();openDayPanel('${ds}')">+${more} more</div>` : "";
@@ -588,7 +602,7 @@ function renderTimeGrid(dates) {
     const dayEvs = allDayByDate[ds] ?? [];
     const rows = dayEvs.slice(0,2).map(ev =>
       `<div class="tg-allday-ev" style="background:${ev.color}"
-        onclick="showEvent('${ev.id}','${ds}','${ev._primaryId??ev.id}','${ev._occDate??ds}')"
+        onclick="_showEvByKey(${_regEv(ev,ds)})"
         title="${esc(ev.title)}">${esc(ev.title)}</div>`
     ).join("");
     const more = dayEvs.length > 2 ? `<div class="tg-allday-more">+${dayEvs.length-2} more</div>` : "";
@@ -634,7 +648,7 @@ function renderTimeGrid(dates) {
       const l = `${(ci * 90 / nCols) + 2}%`;
       const showTime = height > 30;
       return `<div class="tg-ev" style="top:${top}px;height:${height}px;background:${ev.color};width:${w};left:${l}"
-        onclick="showEvent('${ev.id}','${ds}','${ev._primaryId??ev.id}','${ev._occDate??ds}')"
+        onclick="_showEvByKey(${_regEv(ev,ds)})"
         title="${esc(ev.title)}">
         <div class="tg-ev-title">${esc(ev.title)}</div>
         ${showTime ? `<div class="tg-ev-time">${fmtTime(ev.start_time)}</div>` : ""}
@@ -707,7 +721,7 @@ function renderAgenda() {
     const timeStr = ev.all_day ? "All day" : [fmtTime(ev.start_time), fmtTime(ev.end_time)].filter(Boolean).join(" – ");
     const meta = [ev.location, ev.description].filter(Boolean).map(s => s.slice(0,80)).join(" · ");
     html += `<div class="agenda-event${ev.source==="synced"?" synced":ev.source==="cross-app"?" cross-app":""}"
-      onclick="showEvent('${ev.id}','${ev._date}','${ev._primaryId??ev.id}','${ev._occDate??ev._date}')">
+      onclick="_showEvByKey(${_regEv(ev,ev._date)})">
       <div class="ev-color-bar" style="background:${ev.color}"></div>
       <div class="agenda-time">${timeStr}</div>
       <div class="agenda-body">
@@ -721,13 +735,14 @@ function renderAgenda() {
 
 // ─── Day panel ────────────────────────────────────────────────────────────
 function openDayPanel(dateStr) {
+  _evReg = [];
   closePanels();
   const evs = eventsForRange(dateStr, dateStr);
   const dLabel = parseLD(dateStr).toLocaleDateString("en-US", { weekday:"long", month:"long", day:"numeric", year:"numeric" });
   const isToday = dateStr === todayStr();
   const evRows = evs.map(ev => {
     const timeStr = ev.all_day ? "All day" : fmtTime(ev.start_time) + (ev.end_time ? " – " + fmtTime(ev.end_time) : "");
-    return `<div class="day-panel-event" onclick="showEvent('${ev.id}','${dateStr}','${ev._primaryId??ev.id}','${ev._occDate??dateStr}')">
+    return `<div class="day-panel-event" onclick="_showEvByKey(${_regEv(ev,dateStr)})">
       <div style="width:4px;background:${ev.color};border-radius:2px;flex-shrink:0;align-self:stretch"></div>
       <div class="time">${timeStr}</div>
       <div><div class="ev-title">${esc(ev.title)}</div>${ev.location ? `<div class="ev-loc">${esc(ev.location)}</div>` : ""}</div>
@@ -757,6 +772,7 @@ function showEvent(evId, dateStr, primaryId, occDate) {
   const exception = localEvents.find(e => e.recurring_event_id === primaryId && e.original_date === occDate);
   const ev = exception ?? localEvents.find(e => e.id === evId) ?? primary;
   if (!ev) return;
+  const _evDetailKey = _regEv(ev, dateStr);
   const isSynced = ev.source === "synced" || ev.source === "cross-app", isRecurring = !!primary?.recurrence;
   const ruleLabel = isRecurring ? describeRecurrence(JSON.parse(primary.recurrence)) : "";
   const attendees = JSON.parse(ev.attendee_ids || "[]");
@@ -787,7 +803,7 @@ function showEvent(evId, dateStr, primaryId, occDate) {
     <div class="modal-actions">
       ${!isSynced ? `<button class="btn btn-ghost" onclick="closeModal();openEditModal('${primary?.id ?? ev.id}','${occDate}')">Edit</button>
       <button class="btn btn-danger btn-sm" onclick="closeModal();confirmDelete('${primary?.id ?? ev.id}','${occDate}',${isRecurring})">Delete</button>` : ""}
-      ${ev.source === "synced" ? `<button class="btn btn-ghost btn-sm" onclick="hideEvent('${ev.id}')">Hide</button>` : ""}
+      ${ev.source === "synced" ? `<button class="btn btn-ghost btn-sm" onclick="_hideEvByKey(${_evDetailKey})">Hide</button>` : ""}
       <button class="btn btn-ghost" onclick="closeModal()">Close</button>
     </div>`);
 }
@@ -1129,6 +1145,8 @@ window.setView         = setView;
 window.openCreateModal = openCreateModal;
 window.openDayPanel    = openDayPanel;
 window.showEvent       = showEvent;
+window._showEvByKey    = _showEvByKey;
+window._hideEvByKey    = _hideEvByKey;
 window.closeModal      = closeModal;
 window.closePanels     = closePanels;
 
