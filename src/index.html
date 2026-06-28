@@ -832,7 +832,7 @@ function buildEventForm(ev, opts = {}) {
   return `
     <input type="hidden" id="ef-color" value="${ev.color ?? EVENT_COLORS[0]}" />
     <div class="form-row"><label class="form-label">Title</label>
-      <input id="ef-title" class="form-input" type="text" value="${esc(ev.title ?? "")}" placeholder="Event title" autofocus /></div>
+      <input id="ef-title" class="form-input" type="text" value="${esc(ev.title ?? "")}" placeholder="Event title" data-autofocus /></div>
     <div class="form-row toggle-row">
       <label class="form-label" style="margin-bottom:0">All day</label>
       <label class="toggle-switch"><input type="checkbox" id="ef-allday" ${ev.all_day ? "checked" : ""} onchange="toggleAllDay(this)" /><span class="toggle-slider"></span></label>
@@ -1112,6 +1112,9 @@ function openModal(html) {
   modalEl.innerHTML = `<div class="modal">${html}</div>`;
   modalEl.addEventListener("click", e => { if (e.target === modalEl) closeModal(); });
   document.body.appendChild(modalEl);
+  // Programmatic focus works inside cross-origin iframes (unlike the autofocus
+  // attribute, which the browser blocks) because it rides the user's click gesture.
+  modalEl.querySelector("[data-autofocus]")?.focus();
 }
 function closeModal() { modalEl?.remove(); modalEl = null; }
 
