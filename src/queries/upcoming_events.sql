@@ -16,5 +16,5 @@ SELECT
 FROM app_calendar__events
 WHERE is_cancelled  = 0
   AND end_date     >= CURRENT_DATE
-ORDER BY start_date, start_time NULLS FIRST
+ORDER BY start_date, start_time
 LIMIT 100
