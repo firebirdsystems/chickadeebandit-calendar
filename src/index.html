@@ -529,6 +529,12 @@ function updateTitle() {
 // object in a flat array and pass only its integer index to the handler.
 let _evReg = [];
 function _regEv(ev, ds) { _evReg.push({ ev, ds }); return _evReg.length - 1; }
+// The detail modal shows exactly one event; capture its edit/delete target here so
+// the Edit/Delete buttons need not interpolate a DB-controlled id into an inline
+// onclick JS string (an injection vector — ids are attacker-writable via raw SQL).
+let _detailEditId = null, _detailOccDate = null, _detailIsRecurring = false;
+window._editCurrent   = () => openEditModal(_detailEditId, _detailOccDate);
+window._deleteCurrent = () => confirmDelete(_detailEditId, _detailOccDate, _detailIsRecurring);
 function _showEvByKey(k) {
   const { ev, ds } = _evReg[k];
   showEvent(ev.id, ds, ev._primaryId ?? ev.id, ev._occDate ?? ds);
@@ -562,7 +568,7 @@ function renderMonth() {
     const dayEvs = byDate[ds] ?? [], show = dayEvs.slice(0,3), more = dayEvs.length - show.length;
     const pillsHtml = show.map(ev => {
       const timeStr = ev.all_day ? "" : `<span class="ev-time">${fmtTime(ev.start_time)}</span>`;
-      return `<span class="ev-pill${ev.source==="synced"?" synced":ev.source==="cross-app"?" cross-app":""}" style="background:${ev.color}"
+      return `<span class="ev-pill${ev.source==="synced"?" synced":ev.source==="cross-app"?" cross-app":""}" style="background:${esc(ev.color)}"
         onclick="event.stopPropagation();_showEvByKey(${_regEv(ev,ds)})"
         title="${esc(ev.title)}">${timeStr}${esc(ev.title)}</span>`;
     }).join("");
@@ -601,7 +607,7 @@ function renderTimeGrid(dates) {
   const allDayHtml = dates.map(ds => {
     const dayEvs = allDayByDate[ds] ?? [];
     const rows = dayEvs.slice(0,2).map(ev =>
-      `<div class="tg-allday-ev" style="background:${ev.color}"
+      `<div class="tg-allday-ev" style="background:${esc(ev.color)}"
         onclick="_showEvByKey(${_regEv(ev,ds)})"
         title="${esc(ev.title)}">${esc(ev.title)}</div>`
     ).join("");
@@ -647,7 +653,7 @@ function renderTimeGrid(dates) {
       const w = `${90 / nCols}%`;
       const l = `${(ci * 90 / nCols) + 2}%`;
       const showTime = height > 30;
-      return `<div class="tg-ev" style="top:${top}px;height:${height}px;background:${ev.color};width:${w};left:${l}"
+      return `<div class="tg-ev" style="top:${top}px;height:${height}px;background:${esc(ev.color)};width:${w};left:${l}"
         onclick="_showEvByKey(${_regEv(ev,ds)})"
         title="${esc(ev.title)}">
         <div class="tg-ev-title">${esc(ev.title)}</div>
@@ -722,7 +728,7 @@ function renderAgenda() {
     const meta = [ev.location, ev.description].filter(Boolean).map(s => s.slice(0,80)).join(" · ");
     html += `<div class="agenda-event${ev.source==="synced"?" synced":ev.source==="cross-app"?" cross-app":""}"
       onclick="_showEvByKey(${_regEv(ev,ev._date)})">
-      <div class="ev-color-bar" style="background:${ev.color}"></div>
+      <div class="ev-color-bar" style="background:${esc(ev.color)}"></div>
       <div class="agenda-time">${timeStr}</div>
       <div class="agenda-body">
         <div class="agenda-title">${esc(ev.title)}</div>
@@ -743,7 +749,7 @@ function openDayPanel(dateStr) {
   const evRows = evs.map(ev => {
     const timeStr = ev.all_day ? "All day" : fmtTime(ev.start_time) + (ev.end_time ? " – " + fmtTime(ev.end_time) : "");
     return `<div class="day-panel-event" onclick="_showEvByKey(${_regEv(ev,dateStr)})">
-      <div style="width:4px;background:${ev.color};border-radius:2px;flex-shrink:0;align-self:stretch"></div>
+      <div style="width:4px;background:${esc(ev.color)};border-radius:2px;flex-shrink:0;align-self:stretch"></div>
       <div class="time">${timeStr}</div>
       <div><div class="ev-title">${esc(ev.title)}</div>${ev.location ? `<div class="ev-loc">${esc(ev.location)}</div>` : ""}</div>
     </div>`;
@@ -774,6 +780,7 @@ function showEvent(evId, dateStr, primaryId, occDate) {
   if (!ev) return;
   const _evDetailKey = _regEv(ev, dateStr);
   const isSynced = ev.source === "synced" || ev.source === "cross-app", isRecurring = !!primary?.recurrence;
+  _detailEditId = primary?.id ?? ev.id; _detailOccDate = occDate; _detailIsRecurring = isRecurring;
   const ruleLabel = isRecurring ? describeRecurrence(JSON.parse(primary.recurrence)) : "";
   const attendees = JSON.parse(ev.attendee_ids || "[]");
   const attHtml = attendees.map(id => {
@@ -788,7 +795,7 @@ function showEvent(evId, dateStr, primaryId, occDate) {
   openModal(`
     <div class="modal-header">
       <h3 style="display:flex;align-items:center;gap:8px">
-        <span class="ev-detail-color" style="background:${ev.color}"></span>${esc(ev.title)}
+        <span class="ev-detail-color" style="background:${esc(ev.color)}"></span>${esc(ev.title)}
       </h3>
       <button class="btn btn-ghost btn-sm" onclick="closeModal()">✕</button>
     </div>
@@ -801,8 +808,8 @@ function showEvent(evId, dateStr, primaryId, occDate) {
     ${ev.source === "synced" ? `<div style="font-size:.75rem;color:var(--muted);margin-top:4px">Synced from external calendar — editing not available here.</div>` : ""}
     ${ev.source === "cross-app" && ev.source_label ? `<div style="font-size:.75rem;color:var(--muted);margin-top:4px">From ${esc(ev.source_label)} — manage it there.</div>` : ""}
     <div class="modal-actions">
-      ${!isSynced ? `<button class="btn btn-ghost" onclick="closeModal();openEditModal('${primary?.id ?? ev.id}','${occDate}')">Edit</button>
-      <button class="btn btn-danger btn-sm" onclick="closeModal();confirmDelete('${primary?.id ?? ev.id}','${occDate}',${isRecurring})">Delete</button>` : ""}
+      ${!isSynced ? `<button class="btn btn-ghost" onclick="closeModal();_editCurrent()">Edit</button>
+      <button class="btn btn-danger btn-sm" onclick="closeModal();_deleteCurrent()">Delete</button>` : ""}
       ${ev.source === "synced" ? `<button class="btn btn-ghost btn-sm" onclick="_hideEvByKey(${_evDetailKey})">Hide</button>` : ""}
       <button class="btn btn-ghost" onclick="closeModal()">Close</button>
     </div>`);

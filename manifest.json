@@ -34,6 +34,13 @@
     "label": "Calendar",
     "size": "small"
   },
+  "glance": {
+    "source": {
+      "kind": "sql",
+      "query": "SELECT title, start_date AS at FROM app_calendar__events WHERE start_date >= date('now') ORDER BY start_date LIMIT 3"
+    },
+    "display": { "template": "list", "title": "title", "when": "at" }
+  },
   "resource_limits": {
     "max_db_bytes": 104857600
   },
