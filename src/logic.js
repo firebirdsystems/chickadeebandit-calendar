@@ -107,6 +107,56 @@ export function describeRecurrence(rule) {
   return "";
 }
 
+// ── Members & conflicts ───────────────────────────────────────────────────────
+
+/** Every member attached to an event: organizer plus attendees. */
+export function memberIdsOf(ev) {
+  const ids = new Set();
+  if (ev.organizer_id) ids.add(ev.organizer_id);
+  try {
+    for (const id of JSON.parse(ev.attendee_ids || "[]")) if (id) ids.add(id);
+  } catch { /* malformed attendee_ids — organizer only */ }
+  return ids;
+}
+
+/**
+ * Whether two events occupy overlapping time. All-day events block their
+ * whole date range; timed events on the same single day compare minute
+ * intervals (missing end = 1 hour); timed multi-day events that share dates
+ * count as overlapping.
+ */
+export function eventsOverlap(a, b) {
+  const aEnd = a.end_date || a.start_date, bEnd = b.end_date || b.start_date;
+  if (a.start_date > bEnd || b.start_date > aEnd) return false;
+  const aAllDay = !!a.all_day || !a.start_time;
+  const bAllDay = !!b.all_day || !b.start_time;
+  if (aAllDay || bAllDay) return true;
+  if (a.start_date === aEnd && b.start_date === bEnd) {
+    const aS = timeToMins(a.start_time), aE = a.end_time ? timeToMins(a.end_time) : aS + 60;
+    const bS = timeToMins(b.start_time), bE = b.end_time ? timeToMins(b.end_time) : bS + 60;
+    return aS < bE && bS < aE;
+  }
+  return true;
+}
+
+/**
+ * Conflicts a candidate event creates for the given members, against a pool
+ * of already-expanded events (each with concrete dates). `excludeIds` skips
+ * the event being edited and its series overrides.
+ */
+export function findMemberConflicts(candidate, memberIds, events, excludeIds = new Set()) {
+  const conflicts = [];
+  for (const ev of events) {
+    if (excludeIds.has(ev.id) || (ev._primaryId && excludeIds.has(ev._primaryId))) continue;
+    if (ev.is_cancelled) continue;
+    if (!eventsOverlap(candidate, ev)) continue;
+    const evMembers = memberIdsOf(ev);
+    const hits = memberIds.filter(id => evMembers.has(id));
+    if (hits.length) conflicts.push({ event: ev, memberIds: hits });
+  }
+  return conflicts;
+}
+
 export function advanceCursor(d, rule) {
   const next = new Date(d);
   const { freq, interval: iv = 1, days } = rule;

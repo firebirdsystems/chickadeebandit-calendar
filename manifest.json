@@ -2,7 +2,7 @@
   "id": "calendar",
   "name": "Calendar",
   "version": "1.0.0",
-  "description": "Family calendar with manual event creation, recurring events, and series editing. Shows month and agenda views. Merges in events synced from Google Calendar and Apple Calendar.",
+  "description": "Family calendar with manual event creation, recurring events, and series editing. Shows month and agenda views. Merges in events synced from Google Calendar and Apple Calendar. Filter by family member, see who's busy each day, and get warned about scheduling conflicts.",
   "entrypoint": "index.html",
   "runtime": "static",
   "category": "general",

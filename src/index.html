@@ -346,6 +346,40 @@
 
     .loading { text-align: center; padding: 40px; color: var(--muted); }
     .divider { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
+
+    /* ── Member filter bar ───────────────────────────────── */
+    .member-bar { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+    .member-chip {
+      display: flex; align-items: center; gap: 5px;
+      padding: 3px 10px 3px 4px; border-radius: 20px;
+      border: 1.5px solid var(--border); cursor: pointer;
+      font-size: 0.78rem; font-weight: 500; color: var(--muted);
+      background: var(--card); transition: all .12s;
+    }
+    .member-chip:hover { border-color: var(--text); color: var(--text); }
+    .member-chip.selected { border-color: var(--accent); background: var(--accent-light); color: var(--accent); }
+    .member-chip.clear { padding: 3px 10px; }
+
+    /* ── Attendee avatar stacks on event rows ────────────── */
+    .av-stack { display: inline-flex; align-items: center; margin-top: 3px; }
+    .av-stack .attendee-av { margin-right: -5px; border: 1.5px solid var(--card); width: 17px; height: 17px; }
+    .av-stack .av-more { font-size: 0.65rem; color: var(--muted); margin-left: 9px; font-weight: 600; }
+
+    /* ── Who's busy strip (day panel) ────────────────────── */
+    .busy-strip { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+    .busy-chip {
+      display: flex; align-items: center; gap: 5px;
+      padding: 3px 9px 3px 4px; border-radius: 20px;
+      background: var(--accent-light); font-size: 0.75rem; font-weight: 600; color: var(--text);
+    }
+    .busy-chip .busy-n { color: var(--muted); font-weight: 500; }
+
+    /* ── Conflict warning (event form) ───────────────────── */
+    .conflict-box {
+      background: #fffbeb; border: 1px solid #fcd34d; border-radius: 8px;
+      padding: 10px 12px; font-size: 0.8rem; color: #92400e; margin-top: 12px;
+    }
+    .conflict-box ul { margin: 4px 0 0 18px; }
   </style>
   <base href="/run/calendar/" />
 </head>
@@ -368,6 +402,7 @@
       <button class="btn btn-primary" onclick="openCreateModal()">+ Event</button>
     </div>
   </div>
+  <div class="member-bar" id="member-bar"></div>
   <div id="root"><div class="loading">Loading…</div></div>
 </div>
 
@@ -379,6 +414,7 @@ import {
   timeToMins, fmtTime, fmtDate, fmtDateShort,
   normalizeDate, normalizeTime,
   describeRecurrence, advanceCursor,
+  memberIdsOf, findMemberConflicts,
 } from "./logic.js";
 
 const CONTEXT = window.__CONTEXT_URL ?? "";
@@ -389,6 +425,7 @@ const ME      = window.__CURRENT_MEMBER ?? null;
 let members      = [];
 let localEvents  = [];
 let syncedEvents = [];
+let memberFilter = new Set();
 let viewMode     = "week";
 let pivot        = new Date();
 let modalEl      = null;
@@ -439,7 +476,7 @@ async function loadSyncedEvents() {
 }
 
 // ─── Recurrence expansion ─────────────────────────────────────────────────
-function eventsForRange(rangeStart, rangeEnd) {
+function eventsForRange(rangeStart, rangeEnd, { filtered = true } = {}) {
   const results = [];
   const exMap = {};
   for (const ev of localEvents) {
@@ -469,7 +506,10 @@ function eventsForRange(rangeStart, rangeEnd) {
     if (ev.start_date <= rangeEnd && ev.end_date >= rangeStart)
       results.push({ ...ev, _date: ev.start_date });
   }
-  return results.sort((a, b) => {
+  const visible = filtered && memberFilter.size
+    ? results.filter(ev => { const ids = memberIdsOf(ev); return [...memberFilter].some(id => ids.has(id)); })
+    : results;
+  return visible.sort((a, b) => {
     const dc = a._date.localeCompare(b._date);
     if (dc !== 0) return dc;
     if (a.all_day !== b.all_day) return a.all_day ? -1 : 1;
@@ -544,10 +584,42 @@ function _hideEvByKey(k) { hideEvent(_evReg[k].ev.id); }
 function render() {
   _evReg = [];
   updateTitle();
+  renderMemberBar();
   if (viewMode === "month")  renderMonth();
   else if (viewMode === "week") renderWeek();
   else if (viewMode === "day")  renderDay();
   else renderAgenda();
+}
+
+// ─── Member filter bar ────────────────────────────────────────────────────
+function renderMemberBar() {
+  const el = document.getElementById("member-bar");
+  if (!el) return;
+  if (members.length < 2) { el.innerHTML = ""; return; }
+  el.innerHTML = members.map((m, i) =>
+    `<button class="member-chip${memberFilter.has(m.id) ? " selected" : ""}" onclick="_toggleMemberFilter(${i})" title="Show ${esc(m.name)}'s events">
+      <span class="attendee-av" style="background:${memberColor(m.id, members)}">${initial(m.name)}</span>${esc(m.name)}</button>`
+  ).join("") + (memberFilter.size
+    ? `<button class="member-chip clear" onclick="_clearMemberFilter()">✕ Show all</button>` : "");
+}
+window._toggleMemberFilter = (i) => {
+  const id = members[i]?.id;
+  if (!id) return;
+  if (memberFilter.has(id)) memberFilter.delete(id); else memberFilter.add(id);
+  render();
+};
+window._clearMemberFilter = () => { memberFilter.clear(); render(); };
+
+// ─── Attendee avatar stack ────────────────────────────────────────────────
+function avatarStack(ev) {
+  const ids = [...memberIdsOf(ev)].filter(id => members.some(m => m.id === id));
+  if (!ids.length) return "";
+  const shown = ids.slice(0, 4).map(id => {
+    const m = members.find(x => x.id === id);
+    return `<span class="attendee-av" title="${esc(m.name)}" style="background:${memberColor(id, members)}">${initial(m.name)}</span>`;
+  }).join("");
+  const more = ids.length > 4 ? `<span class="av-more">+${ids.length - 4}</span>` : "";
+  return `<span class="av-stack">${shown}${more}</span>`;
 }
 
 // ─── Month view ───────────────────────────────────────────────────────────
@@ -733,6 +805,7 @@ function renderAgenda() {
       <div class="agenda-body">
         <div class="agenda-title">${esc(ev.title)}</div>
         ${meta ? `<div class="agenda-meta">${esc(meta)}</div>` : ""}
+        ${avatarStack(ev)}
       </div>
     </div>`;
   }
@@ -751,9 +824,18 @@ function openDayPanel(dateStr) {
     return `<div class="day-panel-event" onclick="_showEvByKey(${_regEv(ev,dateStr)})">
       <div style="width:4px;background:${esc(ev.color)};border-radius:2px;flex-shrink:0;align-self:stretch"></div>
       <div class="time">${timeStr}</div>
-      <div><div class="ev-title">${esc(ev.title)}</div>${ev.location ? `<div class="ev-loc">${esc(ev.location)}</div>` : ""}</div>
+      <div><div class="ev-title">${esc(ev.title)}</div>${ev.location ? `<div class="ev-loc">${esc(ev.location)}</div>` : ""}${avatarStack(ev)}</div>
     </div>`;
   }).join("") || `<div style="color:var(--muted);font-size:.85rem;padding:8px 0">No events.</div>`;
+  // Who's busy: every member attached to an event this day, with a count.
+  const busyCounts = new Map();
+  for (const ev of evs) for (const id of memberIdsOf(ev)) {
+    if (members.some(m => m.id === id)) busyCounts.set(id, (busyCounts.get(id) ?? 0) + 1);
+  }
+  const busyHtml = busyCounts.size ? `<div class="busy-strip">${[...busyCounts].map(([id, n]) => {
+    const m = members.find(x => x.id === id);
+    return `<span class="busy-chip"><span class="attendee-av" style="background:${memberColor(id, members)}">${initial(m.name)}</span>${esc(m.name)}<span class="busy-n">· ${n}</span></span>`;
+  }).join("")}</div>` : "";
   panelEl = document.createElement("div");
   panelEl.className = "day-panel-backdrop";
   panelEl.innerHTML = `<div class="day-panel">
@@ -761,6 +843,7 @@ function openDayPanel(dateStr) {
       <div class="day-panel-title">${isToday ? "Today — " : ""}${dLabel}</div>
       <button class="btn btn-ghost btn-sm" onclick="closePanels()">✕</button>
     </div>
+    ${busyHtml}
     ${evRows}
     <div style="margin-top:12px">
       <button class="btn btn-primary btn-sm" onclick="closePanels();openCreateModal('${dateStr}')">+ Add event</button>
@@ -893,6 +976,39 @@ window.toggleEndFields = function(type) {
   document.getElementById("rec-count-row").style.display = type === "count" ? "" : "none";
   document.getElementById("rec-date-row").style.display  = type === "date"  ? "" : "none";
 };
+// ─── Conflict warning ─────────────────────────────────────────────────────
+// First save click with attendee conflicts shows a warning and flips the
+// button to "… anyway"; the second click proceeds. Reset on every modal open.
+let conflictAck = false;
+function warnConflicts(data, excludeIds = new Set()) {
+  if (conflictAck) return false;
+  let attendees = [];
+  try { attendees = JSON.parse(data.attendee_ids || "[]"); } catch { /* no attendees */ }
+  if (!attendees.length) return false;
+  const pool = eventsForRange(data.start_date, data.end_date || data.start_date, { filtered: false });
+  const conflicts = findMemberConflicts(data, attendees, pool, excludeIds);
+  if (!conflicts.length) return false;
+  const items = conflicts.slice(0, 4).map(({ event: ev, memberIds }) => {
+    const names = memberIds.map(id => members.find(m => m.id === id)?.name ?? "Someone").join(", ");
+    const time = (ev.all_day || !ev.start_time) ? "all day"
+      : [fmtTime(ev.start_time), fmtTime(ev.end_time)].filter(Boolean).join(" – ");
+    return `<li>${esc(names)}: ${esc(ev.title)} (${fmtDateShort(ev._date ?? ev.start_date)}, ${time})</li>`;
+  }).join("");
+  const extra = conflicts.length > 4 ? `<li>…and ${conflicts.length - 4} more</li>` : "";
+  let box = document.getElementById("conflict-warning");
+  if (!box) {
+    box = document.createElement("div");
+    box.id = "conflict-warning";
+    box.className = "conflict-box";
+    modalEl?.querySelector(".modal-actions")?.before(box);
+  }
+  box.innerHTML = `⚠️ <strong>Schedule conflict</strong><ul>${items}${extra}</ul>`;
+  const btn = modalEl?.querySelector(".modal-actions .btn-primary");
+  if (btn && !btn.textContent.endsWith("anyway")) btn.textContent += " anyway";
+  conflictAck = true;
+  return true;
+}
+
 function collectFormData() {
   const allDay = document.getElementById("ef-allday").checked;
   const freq   = document.getElementById("ef-freq").value;
@@ -933,6 +1049,7 @@ function openCreateModal(defaultDate = null) {
 window.submitCreate = async function() {
   const data = collectFormData();
   if (!data.title) { document.getElementById("ef-title").focus(); return; }
+  if (warnConflicts(data)) return;
   const id = crypto.randomUUID(), now = new Date().toISOString();
   localEvents.push({
     id, ...data, source: "local",
@@ -978,6 +1095,8 @@ window.submitEdit = async function(primaryId, scope, occDate) {
   const now = new Date().toISOString();
   const primary = localEvents.find(e => e.id === primaryId);
   if (!primary) return;
+  const seriesIds = new Set([primaryId, ...localEvents.filter(e => e.recurring_event_id === primaryId).map(e => e.id)]);
+  if (warnConflicts(data, seriesIds)) return;
 
   if (scope === "all" || !primary.recurrence) {
     const prevEvents = [...localEvents];
@@ -1114,6 +1233,7 @@ window.deleteEvent     = deleteEvent;
 // ─── Modal ────────────────────────────────────────────────────────────────
 function openModal(html) {
   closeModal();
+  conflictAck = false;
   modalEl = document.createElement("div");
   modalEl.className = "modal-backdrop";
   modalEl.innerHTML = `<div class="modal">${html}</div>`;

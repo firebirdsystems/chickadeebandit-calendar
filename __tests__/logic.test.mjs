@@ -5,6 +5,7 @@ import {
   timeToMins, fmtTime, fmtDate, fmtDateShort,
   normalizeDate, normalizeTime,
   describeRecurrence, advanceCursor,
+  memberIdsOf, eventsOverlap, findMemberConflicts,
 } from "../src/logic.js";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -216,6 +217,80 @@ describe("describeRecurrence", () => {
   it("describes yearly recurrence", () => {
     expect(describeRecurrence({ freq: "yearly" })).toBe("Yearly");
     expect(describeRecurrence({ freq: "yearly", interval: 2 })).toBe("Every 2 years");
+  });
+});
+
+// ── memberIdsOf ───────────────────────────────────────────────────────────────
+
+describe("memberIdsOf", () => {
+  it("collects organizer and attendees, deduplicated", () => {
+    const ids = memberIdsOf({ organizer_id: "a", attendee_ids: '["a","b"]' });
+    expect([...ids].sort()).toEqual(["a", "b"]);
+  });
+
+  it("tolerates missing or malformed attendee_ids", () => {
+    expect([...memberIdsOf({ organizer_id: "a" })]).toEqual(["a"]);
+    expect([...memberIdsOf({ organizer_id: "a", attendee_ids: "not json" })]).toEqual(["a"]);
+    expect([...memberIdsOf({})]).toEqual([]);
+  });
+});
+
+// ── eventsOverlap ─────────────────────────────────────────────────────────────
+
+describe("eventsOverlap", () => {
+  const timed = (start_date, start_time, end_time, end_date = start_date) =>
+    ({ start_date, start_time, end_date, end_time, all_day: 0 });
+  const allDay = (start_date, end_date = start_date) =>
+    ({ start_date, end_date, start_time: null, end_time: null, all_day: 1 });
+
+  it("detects same-day time overlap", () => {
+    expect(eventsOverlap(timed("2025-06-15", "10:00", "11:00"), timed("2025-06-15", "10:30", "12:00"))).toBe(true);
+  });
+
+  it("back-to-back events do not overlap", () => {
+    expect(eventsOverlap(timed("2025-06-15", "10:00", "11:00"), timed("2025-06-15", "11:00", "12:00"))).toBe(false);
+  });
+
+  it("different days never overlap", () => {
+    expect(eventsOverlap(timed("2025-06-15", "10:00", "11:00"), timed("2025-06-16", "10:00", "11:00"))).toBe(false);
+  });
+
+  it("all-day events block the whole day", () => {
+    expect(eventsOverlap(allDay("2025-06-15"), timed("2025-06-15", "10:00", "11:00"))).toBe(true);
+    expect(eventsOverlap(allDay("2025-06-14", "2025-06-16"), timed("2025-06-15", "10:00", "11:00"))).toBe(true);
+    expect(eventsOverlap(allDay("2025-06-14"), timed("2025-06-15", "10:00", "11:00"))).toBe(false);
+  });
+
+  it("missing end time defaults to one hour", () => {
+    expect(eventsOverlap(timed("2025-06-15", "10:00", null), timed("2025-06-15", "10:30", "12:00"))).toBe(true);
+    expect(eventsOverlap(timed("2025-06-15", "10:00", null), timed("2025-06-15", "11:00", "12:00"))).toBe(false);
+  });
+});
+
+// ── findMemberConflicts ───────────────────────────────────────────────────────
+
+describe("findMemberConflicts", () => {
+  const pool = [
+    { id: "e1", start_date: "2025-06-15", end_date: "2025-06-15", start_time: "10:00", end_time: "11:00", all_day: 0, organizer_id: "alice", attendee_ids: "[]", title: "Dentist" },
+    { id: "e2", start_date: "2025-06-15", end_date: "2025-06-15", start_time: "10:00", end_time: "11:00", all_day: 0, organizer_id: null, attendee_ids: '["bob"]', title: "Practice" },
+    { id: "e3", start_date: "2025-06-15", end_date: "2025-06-15", start_time: "10:00", end_time: "11:00", all_day: 0, organizer_id: "alice", attendee_ids: "[]", is_cancelled: 1 },
+  ];
+  const candidate = { start_date: "2025-06-15", end_date: "2025-06-15", start_time: "10:30", end_time: "11:30", all_day: 0 };
+
+  it("reports only members attached to overlapping events", () => {
+    const conflicts = findMemberConflicts(candidate, ["alice", "carol"], pool);
+    expect(conflicts).toHaveLength(1);
+    expect(conflicts[0].event.id).toBe("e1");
+    expect(conflicts[0].memberIds).toEqual(["alice"]);
+  });
+
+  it("skips excluded events (the one being edited) and cancelled overrides", () => {
+    expect(findMemberConflicts(candidate, ["alice"], pool, new Set(["e1"]))).toHaveLength(0);
+  });
+
+  it("skips expanded instances of an excluded series via _primaryId", () => {
+    const withVirtual = [{ ...pool[0], id: "e1-x", _primaryId: "e1" }];
+    expect(findMemberConflicts(candidate, ["alice"], withVirtual, new Set(["e1"]))).toHaveLength(0);
   });
 });
 
