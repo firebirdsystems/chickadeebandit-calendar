@@ -27,6 +27,7 @@
     "requires_approval": false
   },
   "storage": "db",
+  "capture_consumer": { "kinds": ["event"], "via": "structured" },
   "nav": {
     "label": "Calendar"
   },
