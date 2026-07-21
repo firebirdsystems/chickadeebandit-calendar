@@ -399,7 +399,7 @@
         <button id="vbtn-month"  onclick="setView('month')">Month</button>
         <button id="vbtn-agenda" onclick="setView('agenda')">Agenda</button>
       </div>
-      <button class="btn btn-primary" onclick="openCreateModal()">+ Event</button>
+      <button class="btn btn-primary" id="new-event-btn" onclick="openCreateModal()">+ Event</button>
     </div>
   </div>
   <div class="member-bar" id="member-bar"></div>
@@ -420,6 +420,14 @@ import {
 const CONTEXT = window.__CONTEXT_URL ?? "";
 const DB      = window.__DB_URL      ?? "";
 const ME      = window.__CURRENT_MEMBER ?? null;
+const IS_ADMIN  = window.__IS_ADMIN === true;
+const IS_ROSTER = window.__SPACE_KIND === "roster";
+// Who may create, edit, or delete events. In a roster (classroom / team) only
+// the steward — the space admin/teacher — manages the calendar; everyone else
+// reads it. Elsewhere every member may (calendar's normal shared behavior). The
+// hub enforces this server-side (owner_or_visibility + steward_writes_only on
+// `events`); this only hides controls that would 403.
+const canWrite = !IS_ROSTER || IS_ADMIN;
 
 // ─── State ────────────────────────────────────────────────────────────────
 let members      = [];
@@ -845,9 +853,9 @@ function openDayPanel(dateStr) {
     </div>
     ${busyHtml}
     ${evRows}
-    <div style="margin-top:12px">
+    ${canWrite ? `<div style="margin-top:12px">
       <button class="btn btn-primary btn-sm" onclick="closePanels();openCreateModal('${dateStr}')">+ Add event</button>
-    </div>
+    </div>` : ""}
   </div>`;
   panelEl.addEventListener("click", e => { if (e.target === panelEl) closePanels(); });
   document.body.appendChild(panelEl);
@@ -891,7 +899,7 @@ function showEvent(evId, dateStr, primaryId, occDate) {
     ${ev.source === "synced" ? `<div style="font-size:.75rem;color:var(--muted);margin-top:4px">Synced from external calendar — editing not available here.</div>` : ""}
     ${ev.source === "cross-app" && ev.source_label ? `<div style="font-size:.75rem;color:var(--muted);margin-top:4px">From ${esc(ev.source_label)} — manage it there.</div>` : ""}
     <div class="modal-actions">
-      ${!isSynced ? `<button class="btn btn-ghost" onclick="closeModal();_editCurrent()">Edit</button>
+      ${!isSynced && canWrite ? `<button class="btn btn-ghost" onclick="closeModal();_editCurrent()">Edit</button>
       <button class="btn btn-danger btn-sm" onclick="closeModal();_deleteCurrent()">Delete</button>` : ""}
       ${ev.source === "synced" ? `<button class="btn btn-ghost btn-sm" onclick="_hideEvByKey(${_evDetailKey})">Hide</button>` : ""}
       <button class="btn btn-ghost" onclick="closeModal()">Close</button>
@@ -1297,6 +1305,9 @@ function handleDeepLink() {
       members = ((await res.json())["family.members"]) ?? [];
     } catch { members = []; }
   }
+  // Read-only members (everyone but the steward in a roster) never see the
+  // "+ Event" control — writes would be rejected by the hub anyway.
+  if (!canWrite) { const b = document.getElementById("new-event-btn"); if (b) b.style.display = "none"; }
   await Promise.all([
     fetchMembers(),
     (async () => { if (DB) { await initDb(); await loadLocalEvents(); } })(),

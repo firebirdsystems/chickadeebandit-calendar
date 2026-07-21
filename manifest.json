@@ -14,6 +14,7 @@
     "google",
     "apple"
   ],
+  "contexts": ["household", "shared_space", "shared_space.roster"],
   "data_access": {
     "reads": [
       "family.members",
@@ -21,6 +22,16 @@
       "cross.calendar_events"
     ],
     "writes": []
+  },
+  "row_policies": {
+    "events": {
+      "kind": "owner_or_visibility",
+      "member_column": "created_by",
+      "visibility_column": "visibility",
+      "everyone_values": ["everyone"],
+      "write_visibility_scoped": true,
+      "steward_writes_only": true
+    }
   },
   "permissions": {
     "default_audience": "everyone",
