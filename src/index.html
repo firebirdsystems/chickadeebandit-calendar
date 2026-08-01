@@ -387,23 +387,23 @@
 <div class="app">
   <div class="app-header">
     <div class="nav-group">
-      <button class="btn-icon" onclick="prevPeriod()">‹</button>
-      <span class="cal-title" id="cal-title">…</span>
-      <button class="btn-icon" onclick="nextPeriod()">›</button>
-      <button class="btn btn-ghost btn-sm" onclick="goToday()">Today</button>
+      <button class="btn-icon" data-testid="nav-prev" onclick="prevPeriod()">‹</button>
+      <span class="cal-title" id="cal-title" data-testid="cal-title">…</span>
+      <button class="btn-icon" data-testid="nav-next" onclick="nextPeriod()">›</button>
+      <button class="btn btn-ghost btn-sm" data-testid="nav-today" onclick="goToday()">Today</button>
     </div>
     <div class="nav-group">
       <div class="view-toggle">
-        <button id="vbtn-day"    onclick="setView('day')">Day</button>
-        <button id="vbtn-week"   onclick="setView('week')">Week</button>
-        <button id="vbtn-month"  onclick="setView('month')">Month</button>
-        <button id="vbtn-agenda" onclick="setView('agenda')">Agenda</button>
+        <button id="vbtn-day"    data-testid="view-day"    onclick="setView('day')">Day</button>
+        <button id="vbtn-week"   data-testid="view-week"   onclick="setView('week')">Week</button>
+        <button id="vbtn-month"  data-testid="view-month"  onclick="setView('month')">Month</button>
+        <button id="vbtn-agenda" data-testid="view-agenda" onclick="setView('agenda')">Agenda</button>
       </div>
-      <button class="btn btn-primary" id="new-event-btn" onclick="openCreateModal()">+ Event</button>
+      <button class="btn btn-primary" id="new-event-btn" data-testid="new-event" onclick="openCreateModal()">+ Event</button>
     </div>
   </div>
-  <div class="member-bar" id="member-bar"></div>
-  <div id="root"><div class="loading">Loading…</div></div>
+  <div class="member-bar" id="member-bar" data-testid="member-bar"></div>
+  <div id="root" data-testid="root"><div class="loading">Loading…</div></div>
 </div>
 
 <script type="module">
@@ -634,10 +634,10 @@ function renderMemberBar() {
   if (!el) return;
   if (members.length < 2) { el.innerHTML = ""; return; }
   el.innerHTML = members.map((m, i) =>
-    `<button class="member-chip${memberFilter.has(m.id) ? " selected" : ""}" onclick="_toggleMemberFilter(${i})" title="Show ${esc(m.name)}'s events">
+    `<button class="member-chip${memberFilter.has(m.id) ? " selected" : ""}" data-testid="member-chip" data-member-id="${m.id}" onclick="_toggleMemberFilter(${i})" title="Show ${esc(m.name)}'s events">
       <span class="attendee-av" style="background:${memberColor(m.id, members)}">${initial(m.name)}</span>${esc(m.name)}</button>`
   ).join("") + (memberFilter.size
-    ? `<button class="member-chip clear" onclick="_clearMemberFilter()">✕ Show all</button>` : "");
+    ? `<button class="member-chip clear" data-testid="member-filter-clear" onclick="_clearMemberFilter()">✕ Show all</button>` : "");
 }
 window._toggleMemberFilter = (i) => {
   const id = members[i]?.id;
@@ -678,15 +678,16 @@ function renderMonth() {
     const pillsHtml = show.map(ev => {
       const timeStr = ev.all_day ? "" : `<span class="ev-time">${fmtTime(ev.start_time)}</span>`;
       return `<span class="ev-pill${ev.source==="synced"?" synced":ev.source==="cross-app"?" cross-app":""}" style="background:${esc(ev.color)}"
+        data-testid="event-pill" data-event-id="${ev.id}" data-date="${ds}"
         onclick="event.stopPropagation();_showEvByKey(${_regEv(ev,ds)})"
         title="${esc(ev.title)}">${timeStr}${esc(ev.title)}</span>`;
     }).join("");
-    const moreHtml = more > 0 ? `<div class="ev-more" onclick="event.stopPropagation();openDayPanel('${ds}')">+${more} more</div>` : "";
-    cellsHtml += `<div class="cal-cell${isT?" today":""}${!inM?" other-month":""}" onclick="openDayPanel('${ds}')">
+    const moreHtml = more > 0 ? `<div class="ev-more" data-testid="month-more" onclick="event.stopPropagation();openDayPanel('${ds}')">+${more} more</div>` : "";
+    cellsHtml += `<div class="cal-cell${isT?" today":""}${!inM?" other-month":""}" data-testid="month-cell" data-date="${ds}" onclick="openDayPanel('${ds}')">
       <div class="cal-day-num">${cur.getDate()}</div>${pillsHtml}${moreHtml}</div>`;
     cur.setDate(cur.getDate() + 1);
   }
-  document.getElementById("root").innerHTML = `<div class="cal-grid">${dowHtml}${cellsHtml}</div>`;
+  document.getElementById("root").innerHTML = `<div class="cal-grid" data-testid="month-grid">${dowHtml}${cellsHtml}</div>`;
 }
 
 // ─── Time grid (shared by Day and Week) ───────────────────────────────────
@@ -706,7 +707,7 @@ function renderTimeGrid(dates) {
   // Header row
   const headerHtml = dates.map(ds => {
     const d = parseLD(ds), isT = ds === today;
-    return `<div class="tg-day-hdr${isT?" tg-today":""}" onclick="switchToDay('${ds}')">
+    return `<div class="tg-day-hdr${isT?" tg-today":""}" data-testid="timegrid-day-header" data-date="${ds}" onclick="switchToDay('${ds}')">
       <div class="tg-hdr-dow">${DAYS_SHORT[d.getDay()]}</div>
       <div class="tg-hdr-num">${d.getDate()}</div>
     </div>`;
@@ -717,11 +718,12 @@ function renderTimeGrid(dates) {
     const dayEvs = allDayByDate[ds] ?? [];
     const rows = dayEvs.slice(0,2).map(ev =>
       `<div class="tg-allday-ev" style="background:${esc(ev.color)}"
+        data-testid="allday-event" data-event-id="${ev.id}" data-date="${ds}"
         onclick="_showEvByKey(${_regEv(ev,ds)})"
         title="${esc(ev.title)}">${esc(ev.title)}</div>`
     ).join("");
-    const more = dayEvs.length > 2 ? `<div class="tg-allday-more">+${dayEvs.length-2} more</div>` : "";
-    return `<div class="tg-allday-col">${rows}${more}</div>`;
+    const more = dayEvs.length > 2 ? `<div class="tg-allday-more" data-testid="allday-more">+${dayEvs.length-2} more</div>` : "";
+    return `<div class="tg-allday-col" data-date="${ds}">${rows}${more}</div>`;
   }).join("");
 
   // Hour labels column
@@ -763,6 +765,7 @@ function renderTimeGrid(dates) {
       const l = `${(ci * 90 / nCols) + 2}%`;
       const showTime = height > 30;
       return `<div class="tg-ev" style="top:${top}px;height:${height}px;background:${esc(ev.color)};width:${w};left:${l}"
+        data-testid="timegrid-event" data-event-id="${ev.id}" data-date="${ds}"
         onclick="_showEvByKey(${_regEv(ev,ds)})"
         title="${esc(ev.title)}">
         <div class="tg-ev-title">${esc(ev.title)}</div>
@@ -773,14 +776,14 @@ function renderTimeGrid(dates) {
     const gridLines = Array.from({length:24}, () => `<div class="tg-col-line"></div>`).join("");
     const nowLine = isT ? `<div class="tg-now-line" style="top:${nowTop}px"><div class="tg-now-dot"></div></div>` : "";
 
-    return `<div class="tg-col${isT?" tg-today":""}" style="height:${24*HOUR_H}px">
+    return `<div class="tg-col${isT?" tg-today":""}" data-testid="timegrid-column" data-date="${ds}" style="height:${24*HOUR_H}px">
       <div class="tg-col-lines">${gridLines}</div>
       ${nowLine}${evHtml}
     </div>`;
   }).join("");
 
   document.getElementById("root").innerHTML = `
-    <div class="tg-wrap">
+    <div class="tg-wrap" data-testid="time-grid">
       <div class="tg-header">
         <div class="tg-gutter"></div>
         ${headerHtml}
@@ -822,7 +825,7 @@ window.switchToDay = switchToDay;
 function renderAgenda() {
   const start = toDateStr(pivot), end = addDayStr(start, 60);
   const evs = eventsForRange(start, end);
-  if (!evs.length) { document.getElementById("root").innerHTML = `<div class="agenda-empty">No events in the next 60 days.</div>`; return; }
+  if (!evs.length) { document.getElementById("root").innerHTML = `<div class="agenda-empty" data-testid="agenda-empty">No events in the next 60 days.</div>`; return; }
   const today = todayStr();
   let lastDate = null, html = "";
   for (const ev of evs) {
@@ -830,23 +833,24 @@ function renderAgenda() {
       const d = parseLD(ev._date), isT = ev._date === today;
       const label = isT ? "Today" : ev._date === addDayStr(today,1) ? "Tomorrow"
         : d.toLocaleDateString("en-US", { weekday:"long", month:"long", day:"numeric" });
-      html += `<div class="agenda-day-heading${isT?" today-heading":""}"><span class="day-num">${d.getDate()}</span>${label}</div>`;
+      html += `<div class="agenda-day-heading${isT?" today-heading":""}" data-testid="agenda-day-heading" data-date="${ev._date}"><span class="day-num">${d.getDate()}</span>${label}</div>`;
       lastDate = ev._date;
     }
     const timeStr = ev.all_day ? "All day" : [fmtTime(ev.start_time), fmtTime(ev.end_time)].filter(Boolean).join(" – ");
     const meta = [ev.location, ev.description].filter(Boolean).map(s => s.slice(0,80)).join(" · ");
     html += `<div class="agenda-event${ev.source==="synced"?" synced":ev.source==="cross-app"?" cross-app":""}"
+      data-testid="agenda-event" data-event-id="${ev.id}" data-date="${ev._date}"
       onclick="_showEvByKey(${_regEv(ev,ev._date)})">
       <div class="ev-color-bar" style="background:${esc(ev.color)}"></div>
       <div class="agenda-time">${timeStr}</div>
       <div class="agenda-body">
-        <div class="agenda-title">${esc(ev.title)}</div>
+        <div class="agenda-title" data-testid="agenda-title">${esc(ev.title)}</div>
         ${meta ? `<div class="agenda-meta">${esc(meta)}</div>` : ""}
         ${avatarStack(ev)}
       </div>
     </div>`;
   }
-  document.getElementById("root").innerHTML = `<div class="agenda">${html}</div>`;
+  document.getElementById("root").innerHTML = `<div class="agenda" data-testid="agenda">${html}</div>`;
 }
 
 // ─── Day panel ────────────────────────────────────────────────────────────
@@ -858,12 +862,12 @@ function openDayPanel(dateStr) {
   const isToday = dateStr === todayStr();
   const evRows = evs.map(ev => {
     const timeStr = ev.all_day ? "All day" : fmtTime(ev.start_time) + (ev.end_time ? " – " + fmtTime(ev.end_time) : "");
-    return `<div class="day-panel-event" onclick="_showEvByKey(${_regEv(ev,dateStr)})">
+    return `<div class="day-panel-event" data-testid="day-panel-event" data-event-id="${ev.id}" onclick="_showEvByKey(${_regEv(ev,dateStr)})">
       <div style="width:4px;background:${esc(ev.color)};border-radius:2px;flex-shrink:0;align-self:stretch"></div>
       <div class="time">${timeStr}</div>
-      <div><div class="ev-title">${esc(ev.title)}</div>${ev.location ? `<div class="ev-loc">${esc(ev.location)}</div>` : ""}${avatarStack(ev)}</div>
+      <div><div class="ev-title" data-testid="day-panel-event-title">${esc(ev.title)}</div>${ev.location ? `<div class="ev-loc">${esc(ev.location)}</div>` : ""}${avatarStack(ev)}</div>
     </div>`;
-  }).join("") || `<div style="color:var(--muted);font-size:.85rem;padding:8px 0">No events.</div>`;
+  }).join("") || `<div data-testid="day-panel-empty" style="color:var(--muted);font-size:.85rem;padding:8px 0">No events.</div>`;
   // Who's busy: every member attached to an event this day, with a count.
   const busyCounts = new Map();
   for (const ev of evs) for (const id of memberIdsOf(ev)) {
@@ -875,15 +879,15 @@ function openDayPanel(dateStr) {
   }).join("")}</div>` : "";
   panelEl = document.createElement("div");
   panelEl.className = "day-panel-backdrop";
-  panelEl.innerHTML = `<div class="day-panel">
+  panelEl.innerHTML = `<div class="day-panel" data-testid="day-panel" data-date="${dateStr}">
     <div class="day-panel-header">
-      <div class="day-panel-title">${isToday ? "Today — " : ""}${dLabel}</div>
-      <button class="btn btn-ghost btn-sm" onclick="closePanels()">✕</button>
+      <div class="day-panel-title" data-testid="day-panel-title">${isToday ? "Today — " : ""}${dLabel}</div>
+      <button class="btn btn-ghost btn-sm" data-testid="day-panel-close" onclick="closePanels()">✕</button>
     </div>
     ${busyHtml}
     ${evRows}
     ${canWrite ? `<div style="margin-top:12px">
-      <button class="btn btn-primary btn-sm" onclick="closePanels();openCreateModal('${dateStr}')">+ Add event</button>
+      <button class="btn btn-primary btn-sm" data-testid="day-panel-add" onclick="closePanels();openCreateModal('${dateStr}')">+ Add event</button>
     </div>` : ""}
   </div>`;
   panelEl.addEventListener("click", e => { if (e.target === panelEl) closePanels(); });
@@ -914,10 +918,10 @@ function showEvent(evId, dateStr, primaryId, occDate) {
   const dateRange = ev.start_date === ev.end_date ? fmtDate(ev.start_date, {weekday:true}) : `${fmtDateShort(ev.start_date)} – ${fmtDateShort(ev.end_date)}`;
   openModal(`
     <div class="modal-header">
-      <h3 style="display:flex;align-items:center;gap:8px">
+      <h3 style="display:flex;align-items:center;gap:8px" data-testid="event-detail-title">
         <span class="ev-detail-color" style="background:${esc(ev.color)}"></span>${esc(ev.title)}
       </h3>
-      <button class="btn btn-ghost btn-sm" onclick="closeModal()">✕</button>
+      <button class="btn btn-ghost btn-sm" data-testid="event-detail-close" onclick="closeModal()">✕</button>
     </div>
     <div class="ev-detail-row"><div class="ev-detail-icon">📅</div><div class="ev-detail-val">${dateRange}${timeStr ? " · " + timeStr : ""}</div></div>
     ${ev.location ? `<div class="ev-detail-row"><div class="ev-detail-icon">📍</div><div class="ev-detail-val">${esc(ev.location)}</div></div>` : ""}
@@ -928,22 +932,23 @@ function showEvent(evId, dateStr, primaryId, occDate) {
     ${ev.source === "synced" ? `<div style="font-size:.75rem;color:var(--muted);margin-top:4px">Synced from external calendar — editing not available here.</div>` : ""}
     ${ev.source === "cross-app" && ev.source_label ? `<div style="font-size:.75rem;color:var(--muted);margin-top:4px">From ${esc(ev.source_label)} — manage it there.</div>` : ""}
     <div class="modal-actions">
-      ${!isSynced && canWrite ? `<button class="btn btn-ghost" onclick="closeModal();_editCurrent()">Edit</button>
-      <button class="btn btn-danger btn-sm" onclick="closeModal();_deleteCurrent()">Delete</button>` : ""}
-      ${ev.source === "synced" ? `<button class="btn btn-ghost btn-sm" onclick="_hideEvByKey(${_evDetailKey})">Hide</button>` : ""}
-      <button class="btn btn-ghost" onclick="closeModal()">Close</button>
-    </div>`);
+      ${!isSynced && canWrite ? `<button class="btn btn-ghost" data-testid="event-edit" onclick="closeModal();_editCurrent()">Edit</button>
+      <button class="btn btn-danger btn-sm" data-testid="event-delete" onclick="closeModal();_deleteCurrent()">Delete</button>` : ""}
+      ${ev.source === "synced" ? `<button class="btn btn-ghost btn-sm" data-testid="event-hide" onclick="_hideEvByKey(${_evDetailKey})">Hide</button>` : ""}
+      <button class="btn btn-ghost" data-testid="event-detail-dismiss" onclick="closeModal()">Close</button>
+    </div>`, "event-detail");
 }
 
 // ─── Create / edit modal ──────────────────────────────────────────────────
 function buildEventForm(ev, opts = {}) {
   const colorsHtml = EVENT_COLORS.map(c =>
     `<button type="button" class="color-swatch${(ev.color ?? EVENT_COLORS[0]) === c ? " selected" : ""}"
+      data-testid="color-swatch" data-color="${c}"
       style="background:${c}" onclick="selectColor(this,'${c}')" title="${c}"></button>`
   ).join("");
   const attsHtml = members.map(m => {
     const sel = (JSON.parse(ev.attendee_ids || "[]")).includes(m.id);
-    return `<button type="button" class="attendee-btn${sel ? " selected" : ""}" data-mid="${m.id}" onclick="toggleAttendee(this)">
+    return `<button type="button" class="attendee-btn${sel ? " selected" : ""}" data-testid="attendee-toggle" data-mid="${m.id}" onclick="toggleAttendee(this)">
       <span class="attendee-av" style="background:${memberColor(m.id, members)}">${initial(m.name)}</span>
       ${esc(m.name)}</button>`;
   }).join("");
@@ -959,45 +964,45 @@ function buildEventForm(ev, opts = {}) {
   return `
     <input type="hidden" id="ef-color" value="${ev.color ?? EVENT_COLORS[0]}" />
     <div class="form-row"><label class="form-label">Title</label>
-      <input id="ef-title" class="form-input" type="text" value="${esc(ev.title ?? "")}" placeholder="Event title" data-autofocus /></div>
+      <input id="ef-title" data-testid="field-title" class="form-input" type="text" value="${esc(ev.title ?? "")}" placeholder="Event title" data-autofocus /></div>
     <div class="form-row toggle-row">
       <label class="form-label" style="margin-bottom:0">All day</label>
-      <label class="toggle-switch"><input type="checkbox" id="ef-allday" ${ev.all_day ? "checked" : ""} onchange="toggleAllDay(this)" /><span class="toggle-slider"></span></label>
+      <label class="toggle-switch"><input type="checkbox" id="ef-allday" data-testid="field-allday" ${ev.all_day ? "checked" : ""} onchange="toggleAllDay(this)" /><span class="toggle-slider"></span></label>
     </div>
     <div class="form-row"><label class="form-label">Start</label>
       <div class="form-inline">
-        <input id="ef-start-date" class="form-input" type="date" value="${ev.start_date ?? opts.defaultDate ?? todayStr()}" />
-        <input id="ef-start-time" class="form-input" type="time" value="${ev.start_time ?? "09:00"}" style="${ev.all_day ? "display:none" : ""}" />
+        <input id="ef-start-date" data-testid="field-start-date" class="form-input" type="date" value="${ev.start_date ?? opts.defaultDate ?? todayStr()}" />
+        <input id="ef-start-time" data-testid="field-start-time" class="form-input" type="time" value="${ev.start_time ?? "09:00"}" style="${ev.all_day ? "display:none" : ""}" />
       </div></div>
     <div class="form-row"><label class="form-label">End</label>
       <div class="form-inline">
-        <input id="ef-end-date" class="form-input" type="date" value="${ev.end_date ?? opts.defaultDate ?? todayStr()}" />
-        <input id="ef-end-time" class="form-input" type="time" value="${ev.end_time ?? "10:00"}" style="${ev.all_day ? "display:none" : ""}" />
+        <input id="ef-end-date" data-testid="field-end-date" class="form-input" type="date" value="${ev.end_date ?? opts.defaultDate ?? todayStr()}" />
+        <input id="ef-end-time" data-testid="field-end-time" class="form-input" type="time" value="${ev.end_time ?? "10:00"}" style="${ev.all_day ? "display:none" : ""}" />
       </div></div>
     <div class="form-row"><label class="form-label">Location</label>
-      <input id="ef-loc" class="form-input" type="text" value="${esc(ev.location ?? "")}" placeholder="Add location" /></div>
+      <input id="ef-loc" data-testid="field-location" class="form-input" type="text" value="${esc(ev.location ?? "")}" placeholder="Add location" /></div>
     <div class="form-row"><label class="form-label">Color</label><div class="color-swatches">${colorsHtml}</div></div>
     ${members.length > 0 ? `<div class="form-row"><label class="form-label">Attendees</label><div class="attendee-grid">${attsHtml}</div></div>` : ""}
     <div class="form-row"><label class="form-label">Description</label>
-      <textarea id="ef-desc" class="form-textarea">${esc(ev.description ?? "")}</textarea></div>
+      <textarea id="ef-desc" data-testid="field-description" class="form-textarea">${esc(ev.description ?? "")}</textarea></div>
     <div class="rec-section">
       <div class="form-row"><label class="form-label">Repeats</label>
-        <select id="ef-freq" class="form-select" onchange="toggleRecFields(this.value)">${recOpts}</select></div>
+        <select id="ef-freq" data-testid="field-repeat" class="form-select" onchange="toggleRecFields(this.value)">${recOpts}</select></div>
       <div id="rec-days-row" style="${freq === "weekly" || (rule?.days?.length > 1) ? "" : "display:none"}">
         <div class="form-row"><label class="form-label">On days</label><div class="days-grid">${dayToggles}</div></div></div>
       <div id="rec-ends-row" style="${freq === "none" ? "display:none" : ""}">
         <div class="form-row"><label class="form-label">Ends</label>
-          <select id="ef-end-type" class="form-select" onchange="toggleEndFields(this.value)">
+          <select id="ef-end-type" data-testid="field-repeat-end" class="form-select" onchange="toggleEndFields(this.value)">
             <option value="never" ${endType==="never"?"selected":""}>Never</option>
             <option value="count" ${endType==="count"?"selected":""}>After N occurrences</option>
             <option value="date"  ${endType==="date" ?"selected":""}>On date</option>
           </select></div>
         <div id="rec-count-row" style="${endType==="count" ? "" : "display:none"}">
           <div class="form-row"><label class="form-label">Occurrences</label>
-            <input id="ef-count" class="form-input" type="number" min="2" max="999" value="${rule?.count ?? 10}" style="max-width:120px" /></div></div>
+            <input id="ef-count" data-testid="field-repeat-count" class="form-input" type="number" min="2" max="999" value="${rule?.count ?? 10}" style="max-width:120px" /></div></div>
         <div id="rec-date-row" style="${endType==="date" ? "" : "display:none"}">
           <div class="form-row"><label class="form-label">End date</label>
-            <input id="ef-end-date-rec" class="form-input" type="date" value="${rule?.end_date ?? addDayStr(todayStr(), 365)}" /></div></div>
+            <input id="ef-end-date-rec" data-testid="field-repeat-end-date" class="form-input" type="date" value="${rule?.end_date ?? addDayStr(todayStr(), 365)}" /></div></div>
       </div>
     </div>`;
 }
@@ -1037,6 +1042,7 @@ function warnConflicts(data, excludeIds = new Set()) {
     box = document.createElement("div");
     box.id = "conflict-warning";
     box.className = "conflict-box";
+    box.dataset.testid = "conflict-warning";
     modalEl?.querySelector(".modal-actions")?.before(box);
   }
   box.innerHTML = `⚠️ <strong>Schedule conflict</strong><ul>${items}${extra}</ul>`;
@@ -1076,12 +1082,12 @@ function collectFormData() {
   };
 }
 function openCreateModal(defaultDate = null) {
-  openModal(`<div class="modal-header"><h3>New Event</h3><button class="btn btn-ghost btn-sm" onclick="closeModal()">✕</button></div>
+  openModal(`<div class="modal-header"><h3>New Event</h3><button class="btn btn-ghost btn-sm" data-testid="modal-close" onclick="closeModal()">✕</button></div>
     ${buildEventForm({}, { defaultDate })}
     <div class="modal-actions">
-      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="submitCreate()">Create Event</button>
-    </div>`);
+      <button class="btn btn-ghost" data-testid="modal-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" data-testid="event-create-submit" onclick="submitCreate()">Create Event</button>
+    </div>`, "event-create-modal");
 }
 window.submitCreate = async function() {
   const data = collectFormData();
@@ -1119,12 +1125,12 @@ function openEditModal(primaryId, occDate) {
 function openDirectEdit(ev, scope, occDate) {
   const primary = localEvents.find(e => e.id === (ev._primaryId ?? ev.id)) ?? ev;
   const editTarget = (scope === "this" && ev.recurring_event_id) ? ev : (scope !== "all" ? { ...primary, start_date: occDate, end_date: occDate } : primary);
-  openModal(`<div class="modal-header"><h3>Edit Event</h3><button class="btn btn-ghost btn-sm" onclick="closeModal()">✕</button></div>
+  openModal(`<div class="modal-header"><h3>Edit Event</h3><button class="btn btn-ghost btn-sm" data-testid="modal-close" onclick="closeModal()">✕</button></div>
     ${buildEventForm(editTarget)}
     <div class="modal-actions">
-      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="submitEdit('${primary.id}','${scope}','${occDate}')">Save</button>
-    </div>`);
+      <button class="btn btn-ghost" data-testid="modal-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" data-testid="event-edit-submit" onclick="submitEdit('${primary.id}','${scope}','${occDate}')">Save</button>
+    </div>`, "event-edit-modal");
 }
 window.submitEdit = async function(primaryId, scope, occDate) {
   const data = collectFormData();
@@ -1249,15 +1255,15 @@ function openScopeModal(action, primaryId, occDate) {
   openModal(`
     <div class="modal-header">
       <h3>${isEdit ? "Edit recurring event" : "Delete recurring event"}</h3>
-      <button class="btn btn-ghost btn-sm" onclick="closeModal()">✕</button>
+      <button class="btn btn-ghost btn-sm" data-testid="modal-close" onclick="closeModal()">✕</button>
     </div>
     <p style="font-size:.85rem;color:var(--muted);margin-bottom:14px">Which events do you want to ${isEdit ? "edit" : "delete"}?</p>
     ${scopeOpts.map(o => `
-      <div class="scope-option" onclick="${isEdit ? `closeModal();openDirectEdit_('${primaryId}','${o.scope}','${occDate}')` : `closeModal();deleteEvent('${primaryId}','${occDate}','${o.scope}')`}">
+      <div class="scope-option" data-testid="scope-option" data-scope="${o.scope}" onclick="${isEdit ? `closeModal();openDirectEdit_('${primaryId}','${o.scope}','${occDate}')` : `closeModal();deleteEvent('${primaryId}','${occDate}','${o.scope}')`}">
         <span class="scope-icon">${o.icon}</span>
         <div><div class="scope-label">${o.label}</div><div class="scope-desc">${o.desc}</div></div>
       </div>`).join("")}
-    <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal()">Cancel</button></div>`);
+    <div class="modal-actions"><button class="btn btn-ghost" data-testid="modal-cancel" onclick="closeModal()">Cancel</button></div>`, "event-scope-modal");
 }
 window.openDirectEdit_ = function(primaryId, scope, occDate) {
   const primary = localEvents.find(e => e.id === primaryId);
@@ -1268,12 +1274,14 @@ window.confirmDelete   = confirmDelete;
 window.deleteEvent     = deleteEvent;
 
 // ─── Modal ────────────────────────────────────────────────────────────────
-function openModal(html) {
+// `testid` names the dialog for the UI-scenario runner (ui-scenarios.json), so a
+// scenario can wait on the specific modal it opened rather than any modal.
+function openModal(html, testid = "modal") {
   closeModal();
   conflictAck = false;
   modalEl = document.createElement("div");
   modalEl.className = "modal-backdrop";
-  modalEl.innerHTML = `<div class="modal">${html}</div>`;
+  modalEl.innerHTML = `<div class="modal" data-testid="${testid}">${html}</div>`;
   modalEl.addEventListener("click", e => { if (e.target === modalEl) closeModal(); });
   document.body.appendChild(modalEl);
   // Programmatic focus works inside cross-origin iframes (unlike the autofocus

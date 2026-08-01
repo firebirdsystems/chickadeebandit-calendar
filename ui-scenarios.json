@@ -1,0 +1,55 @@
+{
+  "scenarios": [
+    {
+      "name": "a non-everyone event is absent from another member's rendered calendar",
+      "members": { "owner": "adult", "other": "adult" },
+      "steps": [
+        {
+          "action": "seedRaw",
+          "sql": "INSERT INTO app_calendar__events (id, title, start_date, end_date, all_day, visibility, source, created_by, created_at, updated_at) VALUES (?, ?, date('now','+3 days'), date('now','+3 days'), 1, 'everyone', 'local', ?, datetime('now'), datetime('now'))",
+          "params": ["ui-shared-evt", "Pizza Night", "{{owner}}"]
+        },
+        {
+          "action": "seedRaw",
+          "sql": "INSERT INTO app_calendar__events (id, title, start_date, end_date, all_day, visibility, source, created_by, created_at, updated_at) VALUES (?, ?, date('now','+3 days'), date('now','+3 days'), 1, 'private', 'local', ?, datetime('now'), datetime('now'))",
+          "params": ["ui-private-evt", "Therapy Appointment", "{{owner}}"]
+        },
+
+        { "action": "open", "as": "owner" },
+        { "action": "click", "as": "owner", "selector": "[data-testid=\"view-agenda\"]" },
+        { "action": "waitFor", "as": "owner", "selector": "[data-testid=\"agenda\"]" },
+        { "action": "expectText", "as": "owner", "text": "Pizza Night", "selector": "[data-testid=\"agenda\"]" },
+        { "action": "expectText", "as": "owner", "text": "Therapy Appointment", "selector": "[data-testid=\"agenda\"]" },
+
+        { "action": "open", "as": "other" },
+        { "action": "click", "as": "other", "selector": "[data-testid=\"view-agenda\"]" },
+        { "action": "waitFor", "as": "other", "selector": "[data-testid=\"agenda\"]" },
+        { "action": "expectText", "as": "other", "text": "Pizza Night", "selector": "[data-testid=\"agenda\"]" },
+        { "action": "expectNoText", "as": "other", "text": "Therapy Appointment" }
+      ]
+    },
+    {
+      "name": "an event created through the form survives a reload",
+      "members": { "member": "adult" },
+      "steps": [
+        { "action": "open" },
+        { "action": "click", "selector": "[data-testid=\"new-event\"]" },
+        { "action": "waitFor", "selector": "[data-testid=\"event-create-modal\"]" },
+        { "action": "fill", "selector": "[data-testid=\"field-title\"]", "value": "Dentist" },
+        { "action": "fill", "selector": "[data-testid=\"field-location\"]", "value": "Maple Street" },
+        { "action": "click", "selector": "[data-testid=\"event-create-submit\"]" },
+        { "action": "waitFor", "selector": "[data-testid=\"event-create-modal\"]", "state": "detached" },
+        { "action": "expectText", "text": "Dentist", "selector": "[data-testid=\"time-grid\"]" },
+
+        { "action": "reload" },
+        { "action": "expectCount", "selector": "[data-testid=\"timegrid-event\"]", "count": 1 },
+        { "action": "expectText", "text": "Dentist", "selector": "[data-testid=\"time-grid\"]" },
+
+        { "action": "click", "selector": "[data-testid=\"timegrid-event\"]" },
+        { "action": "waitFor", "selector": "[data-testid=\"event-detail\"]" },
+        { "action": "expectText", "text": "Maple Street", "selector": "[data-testid=\"event-detail\"]" },
+        { "action": "expectVisible", "selector": "[data-testid=\"event-delete\"]" }
+      ]
+    }
+  ]
+}
