@@ -40,6 +40,71 @@
       "steward_writes_only": true
     }
   },
+  "automation_actions": {
+    "create_event": {
+      "title": "Put a date on the calendar",
+      "description": "Add an all-day event when another app records something dated — a care visit, a capsule's reveal date, an appointment.",
+      "params": {
+        "title": { "type": "text", "label": "Event title", "required": true },
+        "event_date": { "type": "text", "label": "Date (yyyy-mm-dd)", "required": true },
+        "description": { "type": "text", "label": "Description", "default": "" }
+      },
+      "dedupe": { "table": "events", "column": "source_event_id" },
+      "steps": [
+        {
+          "op": "insert",
+          "table": "events",
+          "values": {
+            "id": "$uuid",
+            "title": ":title",
+            "description": ":description",
+            "start_date": ":event_date",
+            "end_date": ":event_date",
+            "all_day": "1",
+            "created_by": "automation",
+            "created_at": "$now",
+            "updated_at": "$now",
+            "source_event_id": "$event_id"
+          }
+        }
+      ]
+    }
+  },
+  "suggested_automations": [
+    {
+      "title": "Put elder-care appointments on the calendar",
+      "description": "An appointment added in the elder-care app becomes an all-day calendar event, so whoever is driving sees it on Today without opening that app.",
+      "trigger_event": "elder_care.appointment_added",
+      "target_app_id": "calendar",
+      "action_id": "create_event",
+      "param_map": {
+        "title": { "kind": "payload_field", "value": "title" },
+        "event_date": { "kind": "payload_field", "value": "date" }
+      }
+    },
+    {
+      "title": "Put scheduled elder-care visits on the calendar",
+      "description": "When a visit is scheduled, it lands on the shared calendar so the rota is visible to everyone, not only inside the elder-care app.",
+      "trigger_event": "elder_care.visit_scheduled",
+      "target_app_id": "calendar",
+      "action_id": "create_event",
+      "param_map": {
+        "title": { "kind": "const", "value": "Elder-care visit" },
+        "event_date": { "kind": "payload_field", "value": "date" }
+      }
+    },
+    {
+      "title": "Put a time capsule's reveal date on the calendar",
+      "description": "Sealing a capsule adds its reveal date to the calendar, so the day it opens doesn't pass unnoticed months later.",
+      "trigger_event": "time_capsule.created",
+      "target_app_id": "calendar",
+      "action_id": "create_event",
+      "param_map": {
+        "title": { "kind": "payload_field", "value": "title" },
+        "event_date": { "kind": "payload_field", "value": "reveal_date" }
+      }
+    }
+  ],
   "permissions": {
     "default_audience": "everyone",
     "requires_approval": false
