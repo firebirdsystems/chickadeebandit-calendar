@@ -136,3 +136,22 @@ if (manifest.ai_access) {
     });
   }
 }
+
+// Member removal (manifest.member_references). `attendee_ids` is a JSON array
+// of member ids, and logic.js memberIdsOf() feeds it to conflict detection — a
+// departed member left in the list keeps producing phantom double-bookings and
+// an attendee chip nobody can resolve, on every event they were ever invited
+// to. prune_list removes just their id; the column is encrypted at rest (no
+// `_id` suffix, not in db_plaintext_columns), which that action supports. The
+// organizer and creator ids are the event's record and stay.
+describe("member_references", () => {
+  it("prunes departed attendees and keeps event attribution", () => {
+    expect(manifest.member_references).toEqual({
+      events: [
+        { column: "attendee_ids", on_removed: "prune_list" },
+        { column: "organizer_id", on_removed: "keep" },
+        { column: "created_by", on_removed: "keep" },
+      ],
+    });
+  });
+});

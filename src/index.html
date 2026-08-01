@@ -446,14 +446,43 @@ const HOUR_H = 56; // px per hour in time grid
 async function db(sql, params = []) {
   if (!DB) return { rows: [] };
   const res = await fetch(DB, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sql, params }) });
-  return res.json();
+  const json = await res.json();
+  // The hub reports a refused write as a JSON body with an `error` key
+  // (403 row policy, 400 bad statement, 507 over quota). fetch() does not
+  // reject on those, so without this throw every caller's rollback and
+  // error toast below is unreachable code.
+  if (!res.ok || json.error) throw new Error(json.error || `Database request failed (${res.status})`);
+  return json;
+}
+/**
+ * Several statements as one transaction — all apply, or none does.
+ *
+ * Splitting a recurring series is exactly two writes that must agree: cap the
+ * original series the day before the split, and create (or delete) what follows.
+ * Run as concurrent requests, either could fail alone — capping without creating
+ * silently truncates the series, and creating without capping leaves two series
+ * overlapping on the same dates, each showing the other's occurrences.
+ */
+async function dbBatch(statements) {
+  if (!DB || statements.length === 0) return { results: [] };
+  const res = await fetch(DB, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ statements }) });
+  const json = await res.json();
+  if (!res.ok || json.error) throw new Error(json.error || `Database request failed (${res.status})`);
+  return json;
 }
 async function initDb() {
   // Schema is managed by hub migrations (migrations/001_init.sql)
 }
 async function loadLocalEvents() {
-  const { rows } = await db(`SELECT * FROM app_calendar__events WHERE source = 'local' ORDER BY start_date, start_time`);
-  localEvents = rows ?? [];
+  // start_time is encrypted at rest, so only start_date can be ordered in SQL;
+  // within-day order has to be applied here, after the hub decrypts. Nulls
+  // (all-day events) sort first, matching the widget.
+  const { rows } = await db(`SELECT * FROM app_calendar__events WHERE source = 'local' ORDER BY start_date`);
+  localEvents = (rows ?? []).sort((a, b) =>
+    (a.start_date ?? "").localeCompare(b.start_date ?? "")
+    || (a.start_time == null ? 0 : 1) - (b.start_time == null ? 0 : 1)
+    || (a.start_time ?? "").localeCompare(b.start_time ?? "")
+  );
 }
 async function loadSyncedEvents() {
   if (!CONTEXT) return;
@@ -1141,11 +1170,11 @@ window.submitEdit = async function(primaryId, scope, occDate) {
     const rule = JSON.parse(primary.recurrence ?? "{}");
     rule.end_date = addDayStr(occDate, -1);
     const newId = crypto.randomUUID();
-    await Promise.all([
-      db(`UPDATE app_calendar__events SET recurrence=?,updated_at=? WHERE id=?`, [JSON.stringify(rule),now,primaryId]),
-      db(`INSERT INTO app_calendar__events (id,title,description,location,start_date,start_time,end_date,end_time,all_day,color,organizer_id,attendee_ids,recurrence,source,created_by,created_at,updated_at)
+    await dbBatch([
+      { sql: `UPDATE app_calendar__events SET recurrence=?,updated_at=? WHERE id=?`, params: [JSON.stringify(rule),now,primaryId] },
+      { sql: `INSERT INTO app_calendar__events (id,title,description,location,start_date,start_time,end_date,end_time,all_day,color,organizer_id,attendee_ids,recurrence,source,created_by,created_at,updated_at)
          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'local',?,?,?)`,
-        [newId,data.title,data.description,data.location,occDate,data.start_time,occDate,data.end_time,data.all_day,data.color,ME?.id??null,data.attendee_ids,data.recurrence,ME?.id??null,now,now]),
+        params: [newId,data.title,data.description,data.location,occDate,data.start_time,occDate,data.end_time,data.all_day,data.color,ME?.id??null,data.attendee_ids,data.recurrence,ME?.id??null,now,now] },
     ]);
   }
   await loadLocalEvents(); closeModal(); render();
@@ -1201,9 +1230,9 @@ async function deleteEvent(primaryId, occDate, scope) {
   } else if (scope === "following") {
     const rule = JSON.parse(primary.recurrence ?? "{}");
     rule.end_date = addDayStr(occDate, -1); rule.end_type = "date";
-    await Promise.all([
-      db(`UPDATE app_calendar__events SET recurrence=?,updated_at=? WHERE id=?`, [JSON.stringify(rule), now, primaryId]),
-      db(`DELETE FROM app_calendar__events WHERE recurring_event_id=? AND original_date>=?`, [primaryId, occDate]),
+    await dbBatch([
+      { sql: `UPDATE app_calendar__events SET recurrence=?,updated_at=? WHERE id=?`, params: [JSON.stringify(rule), now, primaryId] },
+      { sql: `DELETE FROM app_calendar__events WHERE recurring_event_id=? AND original_date>=?`, params: [primaryId, occDate] },
     ]);
   }
   await loadLocalEvents(); closeModal(); render();

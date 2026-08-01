@@ -82,7 +82,13 @@ async function dbq(sql, params = []) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ sql, params }),
   });
-  return res.json();
+  const json = await res.json();
+  // The hub reports a refused write as a JSON body with an `error` key
+  // (403 row policy, 400 bad statement, 507 over quota). fetch() does not
+  // reject on those, so without this throw every caller's rollback and
+  // error toast below is unreachable code.
+  if (!res.ok || json.error) throw new Error(json.error || `Database request failed (${res.status})`);
+  return json;
 }
 
 function fmtTime(t) {
@@ -108,7 +114,10 @@ async function load() {
     `SELECT id, title, start_date, start_time, all_day, color
      FROM app_calendar__events
      WHERE start_date >= ? AND is_cancelled = 0
-     ORDER BY start_date ASC, CASE WHEN start_time IS NULL THEN 0 ELSE 1 END, start_time ASC
+     -- start_time is encrypted at rest: IS NULL still works (a NULL stays a
+     -- NULL), but comparing its value orders ciphertext, so clock-time order is
+     -- applied below, after the hub decrypts.
+     ORDER BY start_date ASC, CASE WHEN start_time IS NULL THEN 0 ELSE 1 END
      LIMIT 15`,
     [TODAY]
   );
@@ -118,6 +127,12 @@ async function load() {
   for (const r of rows) {
     if (!groups.has(r.start_date)) groups.set(r.start_date, []);
     groups.get(r.start_date).push(r);
+  }
+  for (const dayRows of groups.values()) {
+    dayRows.sort((a, b) =>
+      (a.start_time == null ? 0 : 1) - (b.start_time == null ? 0 : 1)
+      || (a.start_time ?? "").localeCompare(b.start_time ?? "")
+    );
   }
 
   // Keep today + next 3 non-empty days
