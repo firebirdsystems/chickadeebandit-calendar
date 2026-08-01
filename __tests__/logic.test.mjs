@@ -5,7 +5,7 @@ import {
   timeToMins, fmtTime, fmtDate, fmtDateShort,
   normalizeDate, normalizeTime,
   describeRecurrence, advanceCursor,
-  memberIdsOf, eventsOverlap, findMemberConflicts,
+  memberIdsOf, eventsOverlap, findMemberConflicts, searchableFields,
 } from "../src/logic.js";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -322,5 +322,13 @@ describe("advanceCursor", () => {
 
   it("advances by 1 year for yearly", () => {
     expect(toDateStr(advanceCursor(d("2025-06-15"), { freq: "yearly" }))).toBe("2026-06-15");
+  });
+});
+
+describe("searchableFields", () => {
+  it("matches on location and description, not just the event title", () => {
+    const fields = searchableFields({ title: "Checkup", description: "bring the referral", location: "Dr Ruiz, Mill Rd" });
+    expect(fields).toContain("Dr Ruiz, Mill Rd");
+    expect(fields).toContain("bring the referral");
   });
 });

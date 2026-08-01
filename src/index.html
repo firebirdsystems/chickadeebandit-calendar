@@ -380,6 +380,13 @@
       padding: 10px 12px; font-size: 0.8rem; color: #92400e; margin-top: 12px;
     }
     .conflict-box ul { margin: 4px 0 0 18px; }
+    .search-row { margin-bottom: 12px; }
+    .search-input {
+      width: 100%; border: 1.5px solid var(--border-mid, var(--border, #d1d5db));
+      border-radius: 8px; padding: 9px 11px; font: inherit;
+      background: var(--surface, var(--card, #fff)); color: var(--text, inherit);
+    }
+    .search-input:focus { outline: none; border-color: var(--accent, #6366f1); }
   </style>
   <base href="/run/calendar/" />
 </head>
@@ -407,14 +414,14 @@
 </div>
 
 <script type="module">
-import { memberColor, initial, esc, isAdult, hubConfirm } from "/hub-sdk.js";
+import { memberColor, initial, esc, isAdult, hubConfirm, searchMatch } from "/hub-sdk.js";
 import {
   MONTHS, MONTHS_SHORT, DAYS_SHORT, DAYS_ABBR, DAY_NAMES, EVENT_COLORS,
   p2, toDateStr, parseLD, addDaysObj, addDayStr, todayStr, daysBetween, getWeekStart,
   timeToMins, fmtTime, fmtDate, fmtDateShort,
   normalizeDate, normalizeTime,
   describeRecurrence, advanceCursor,
-  memberIdsOf, findMemberConflicts,
+  memberIdsOf, findMemberConflicts, searchableFields,
 } from "./logic.js";
 
 const CONTEXT = window.__CONTEXT_URL ?? "";
@@ -435,6 +442,7 @@ let localEvents  = [];
 let syncedEvents = [];
 let memberFilter = new Set();
 let viewMode     = "week";
+let searchQ = "";       // in-app search (see logic.js searchableFields)
 let pivot        = new Date();
 let modalEl      = null;
 let panelEl      = null;
@@ -823,9 +831,21 @@ window.switchToDay = switchToDay;
 
 // ─── Agenda view ──────────────────────────────────────────────────────────
 function renderAgenda() {
-  const start = toDateStr(pivot), end = addDayStr(start, 60);
-  const evs = eventsForRange(start, end);
-  if (!evs.length) { document.getElementById("root").innerHTML = `<div class="agenda-empty" data-testid="agenda-empty">No events in the next 60 days.</div>`; return; }
+  // Browsing shows the next 60 days. A search widens the window to a year
+  // either side — localEvents holds every event, so the only limit is how far
+  // recurrence is worth expanding.
+  const start = searchQ ? addDayStr(toDateStr(pivot), -365) : toDateStr(pivot);
+  const end   = addDayStr(start, searchQ ? 730 : 60);
+  const all = eventsForRange(start, end);
+  const evs = searchQ ? all.filter(ev => searchMatch(searchQ, searchableFields(ev))) : all;
+  const searchRow = `<div class="search-row"><input id="search" class="search-input" type="search" placeholder="Search events…" aria-label="Search events" value="${esc(searchQ)}" /></div>`;
+  if (!evs.length) {
+    document.getElementById("root").innerHTML = searchRow + (searchQ
+      ? `<div class="agenda-empty" data-testid="agenda-empty">No events match "${esc(searchQ)}" within a year either way.</div>`
+      : `<div class="agenda-empty" data-testid="agenda-empty">No events in the next 60 days.</div>`);
+    restoreSearchCaret();
+    return;
+  }
   const today = todayStr();
   let lastDate = null, html = "";
   for (const ev of evs) {
@@ -850,8 +870,22 @@ function renderAgenda() {
       </div>
     </div>`;
   }
-  document.getElementById("root").innerHTML = `<div class="agenda" data-testid="agenda">${html}</div>`;
+  document.getElementById("root").innerHTML = searchRow + `<div class="agenda" data-testid="agenda">${html}</div>`;
+  restoreSearchCaret();
 }
+
+// renderAgenda rewrites #root, so the box has to be refocused after a keystroke.
+function restoreSearchCaret() {
+  if (!searchQ) return;
+  const el = document.getElementById("search");
+  if (el) { el.focus(); el.setSelectionRange(searchQ.length, searchQ.length); }
+}
+
+document.addEventListener("input", (e) => {
+  if (e.target.id !== "search") return;
+  searchQ = e.target.value;
+  renderAgenda();
+});
 
 // ─── Day panel ────────────────────────────────────────────────────────────
 function openDayPanel(dateStr) {

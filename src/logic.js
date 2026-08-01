@@ -179,3 +179,12 @@ export function advanceCursor(d, rule) {
   }
   return next;
 }
+
+/**
+ * Fields the in-app search matches against (see hub-sdk `searchMatch`).
+ * Location and description count as well as the title — "where was
+ * that appointment" is the question, and the answer is in the location.
+ */
+export function searchableFields(item) {
+  return [item.title, item.description, item.location];
+}
