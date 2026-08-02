@@ -436,6 +436,31 @@ const IS_ROSTER = window.__SPACE_KIND === "roster";
 // `events`); this only hides controls that would 403.
 const canWrite = !IS_ROSTER || IS_ADMIN;
 
+const EVENTS = window.__EVENTS_URL ?? "";
+
+// Announce a newly created event on the cross-app bus so other apps can react to
+// a date the household just committed to — open a volunteer sheet, file a care
+// task, start a capsule. Only the manually created event fires: a synced
+// provider feed would re-emit hundreds of rows on every poll, and an edit or a
+// cancellation is not a new commitment.
+//
+// Title and date only. Every calendar row is visibility 'everyone', so the title
+// is already household-wide, but the description and location are the parts
+// people put addresses and private notes in and they do not belong in every
+// rule's payload.
+async function publishEvent(type, subjectId, payload = {}) {
+  if (!EVENTS) return;
+  try {
+    await fetch(EVENTS, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type, subject_id: subjectId, payload }),
+    });
+  } catch {
+    // Best-effort: the row is already written, so a failed publish is not fatal.
+  }
+}
+
 // ─── State ────────────────────────────────────────────────────────────────
 let members      = [];
 let localEvents  = [];
@@ -1143,6 +1168,12 @@ window.submitCreate = async function() {
       [id, data.title, data.description, data.location, data.start_date, data.start_time, data.end_date, data.end_time,
        data.all_day, data.color, ME?.id ?? null, data.attendee_ids, data.recurrence, ME?.id ?? null, now, now]
     );
+    await publishEvent("calendar.event_created", id, {
+      title: data.title,
+      start_date: data.start_date,
+      all_day: data.all_day === 1,
+      created_by: ME?.id ?? "unknown",
+    });
   } catch {
     localEvents = localEvents.filter(e => e.id !== id);
     render();

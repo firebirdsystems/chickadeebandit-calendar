@@ -40,6 +40,8 @@
       "steward_writes_only": true
     }
   },
+  "publishes": ["calendar.event_created"],
+  "publish_acls": {"calendar.event_created": {"require_role": "member"}},
   "automation_actions": {
     "create_event": {
       "title": "Put a date on the calendar",
