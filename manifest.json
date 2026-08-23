@@ -1,7 +1,7 @@
 {
   "id": "calendar",
   "name": "Calendar",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Family calendar with manual event creation, recurring events, and series editing. Shows month and agenda views. Merges in events synced from Google Calendar and Apple Calendar. Filter by family member, see who's busy each day, and get warned about scheduling conflicts.",
   "entrypoint": "index.html",
   "runtime": "static",
@@ -43,13 +43,18 @@
   "publishes": ["calendar.event_created"],
   "publish_acls": {"calendar.event_created": {"require_role": "member"}},
   "automation_actions": {
-    "create_event": {
+    "upsert_dated_event": {
       "title": "Put a date on the calendar",
-      "description": "Add an all-day event when another app records something dated — a care visit, a capsule's reveal date, an appointment.",
+      "description": "Add an all-day event when another app records something dated — a renewal to decide on, a care visit, a capsule's reveal day. The other app supplies a steady reference for the thing itself, so if that date later moves this MOVES the entry it already made instead of adding a second one beside it, and \"Take a date off the calendar\" can take that same entry back down.",
       "params": {
         "title": { "type": "text", "label": "Event title", "required": true },
         "event_date": { "type": "text", "label": "Date (yyyy-mm-dd)", "required": true },
-        "description": { "type": "text", "label": "Description", "default": "" }
+        "description": { "type": "text", "label": "Description", "default": "" },
+        "source_ref_id": {
+          "type": "text",
+          "label": "Reference from the source app",
+          "required": true
+        }
       },
       "dedupe": { "table": "events", "column": "source_event_id" },
       "steps": [
@@ -66,22 +71,59 @@
             "created_by": "automation",
             "created_at": "$now",
             "updated_at": "$now",
-            "source_event_id": "$event_id"
+            "source_event_id": "$event_id",
+            "source_ref_id": ":source_ref_id",
+            "is_cancelled": "0"
+          },
+          "on_conflict": {
+            "columns": ["source_ref_id"],
+            "update": ["title", "description", "start_date", "end_date", "updated_at", "is_cancelled"]
           }
+        }
+      ]
+    },
+    "retract_dated_event": {
+      "title": "Take a date off the calendar",
+      "description": "The counterpart to \"Put a date on the calendar\": when the other app's thing is called off — a subscription cancelled, an appointment removed — the entry it put here stops showing. Matched by the same reference the entry was made with, so it only ever affects that one entry.",
+      "params": {
+        "source_ref_id": {
+          "type": "text",
+          "label": "Reference from the source app",
+          "required": true
+        }
+      },
+      "steps": [
+        {
+          "op": "set",
+          "table": "events",
+          "set": { "is_cancelled": "1", "updated_at": "$now" },
+          "where": { "source_ref_id": ":source_ref_id" }
         }
       ]
     }
   },
+  "db_plaintext_columns": ["is_cancelled"],
   "suggested_automations": [
     {
       "title": "Put elder-care appointments on the calendar",
       "description": "An appointment added in the elder-care app becomes an all-day calendar event, so whoever is driving sees it on Today without opening that app.",
       "trigger_event": "elder_care.appointment_added",
       "target_app_id": "calendar",
-      "action_id": "create_event",
+      "action_id": "upsert_dated_event",
       "param_map": {
         "title": { "kind": "payload_field", "value": "title" },
-        "event_date": { "kind": "payload_field", "value": "date" }
+        "event_date": { "kind": "payload_field", "value": "date" },
+        "source_ref_id": { "kind": "payload_field", "value": "source_ref_id" }
+      }
+    },
+    {
+      "title": "Take removed elder-care appointments off the calendar",
+      "description": "The other half of the rule above. When an appointment is removed in the elder-care app, the calendar entry it made stops showing — rather than leaving whoever is driving an appointment that is not happening. Add both, or the entry outlives the appointment.",
+      "trigger_event": "elder_care.appointment_cancelled",
+      "target_app_id": "calendar",
+      "action_id": "retract_dated_event",
+      "param_map": {
+        "source_ref_id": { "kind": "payload_field", "value": "source_ref_id" }
       }
     },
     {
@@ -89,10 +131,21 @@
       "description": "When a visit is scheduled, it lands on the shared calendar so the rota is visible to everyone, not only inside the elder-care app.",
       "trigger_event": "elder_care.visit_scheduled",
       "target_app_id": "calendar",
-      "action_id": "create_event",
+      "action_id": "upsert_dated_event",
       "param_map": {
         "title": { "kind": "const", "value": "Elder-care visit" },
-        "event_date": { "kind": "payload_field", "value": "date" }
+        "event_date": { "kind": "payload_field", "value": "date" },
+        "source_ref_id": { "kind": "payload_field", "value": "source_ref_id" }
+      }
+    },
+    {
+      "title": "Take removed elder-care visits off the calendar",
+      "description": "The other half of the rule above. A visit removed from the rota stops showing on the calendar, so the rota people read is the rota that exists. Add both, or the entry outlives the visit.",
+      "trigger_event": "elder_care.visit_cancelled",
+      "target_app_id": "calendar",
+      "action_id": "retract_dated_event",
+      "param_map": {
+        "source_ref_id": { "kind": "payload_field", "value": "source_ref_id" }
       }
     },
     {
@@ -100,10 +153,11 @@
       "description": "Sealing a capsule adds its reveal date to the calendar, so the day it opens doesn't pass unnoticed months later.",
       "trigger_event": "time_capsule.created",
       "target_app_id": "calendar",
-      "action_id": "create_event",
+      "action_id": "upsert_dated_event",
       "param_map": {
         "title": { "kind": "payload_field", "value": "title" },
-        "event_date": { "kind": "payload_field", "value": "reveal_date" }
+        "event_date": { "kind": "payload_field", "value": "reveal_date" },
+        "source_ref_id": { "kind": "payload_field", "value": "source_ref_id" }
       }
     }
   ],

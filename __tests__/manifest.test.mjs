@@ -166,14 +166,18 @@ describe("member_references", () => {
 
 const AUTOMATION_PREFIX = `app_${manifest.id.replace(/-/g, "_")}__`;
 
-function migrationSchema() {
+function migrationSql() {
   const dir = join(__dirname, "../migrations");
-  const sql = readdirSync(dir)
+  return readdirSync(dir)
     .filter((f) => f.endsWith(".sql"))
     .sort()
     .map((f) => readFileSync(join(dir, f), "utf-8"))
     .join("\n")
     .replace(/--[^\n]*/g, "");
+}
+
+function migrationSchema() {
+  const sql = migrationSql();
 
   const tables = {};
   const createRe = /CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+([A-Za-z_]\w*)\s*\(([\s\S]*?)\n\s*\)\s*;/gi;
@@ -241,6 +245,38 @@ describe.skipIf(!manifest.automation_actions)("automation_actions match the migr
         }
       });
 
+      it("every on_conflict target is a UNIQUE index and is plaintext", () => {
+        for (const step of action.steps) {
+          const conflict = step.on_conflict;
+          if (!conflict || typeof conflict !== "object") continue;
+          const cols = table(step.table) ?? {};
+          for (const col of conflict.columns) {
+            expect(cols[col], `${step.table}.${col} is not in the migrations`).toBeTruthy();
+            // SQLite rejects ON CONFLICT against a target with no unique
+            // constraint, and the dispatcher's generated SQL carries no WHERE,
+            // so a PARTIAL unique index would not match either — the upsert
+            // would fail at runtime, in someone's household, as a failed run.
+            const unique = new RegExp(
+              `CREATE\\s+UNIQUE\\s+INDEX(?:\\s+IF\\s+NOT\\s+EXISTS)?\\s+\\w+\\s+ON\\s+${AUTOMATION_PREFIX}${step.table}\\s*\\(\\s*${col}\\s*\\)\\s*;`,
+              "i",
+            );
+            expect(unique.test(migrationSql()), `${step.table}.${col} needs a plain UNIQUE index`).toBe(true);
+            // Same reason as the dedupe column: the codec's random IV means an
+            // encrypted column can never collide, so every run would insert.
+            const plain =
+              manifest.db_encryption === "off" ||
+              /(_id|_at|_date|_by)$/.test(col) ||
+              (manifest.db_plaintext_columns ?? []).includes(col);
+            expect(plain, `${col} would be encrypted at rest`).toBe(true);
+          }
+          // An overwrite-all upsert would blank the columns the household
+          // edited on the entry by hand — the update list stays explicit.
+          for (const col of conflict.update) {
+            expect(step.values[col], `on_conflict.update names ${col}, which the insert does not set`).toBeTruthy();
+          }
+        }
+      });
+
       it("the dedupe column exists and is plaintext", () => {
         if (!action.dedupe) return;
         const cols = table(action.dedupe.table) ?? {};
@@ -267,8 +303,115 @@ describe.skipIf(!manifest.automation_actions)("automation_actions match the migr
           }
         }
       });
+
+      it("`set` steps are bounded and write only columns this app compares on", () => {
+        for (const step of action.steps) {
+          if (step.op !== "set") continue;
+          // An UPDATE with no WHERE rewrites every row in the table. The hub
+          // refuses one at install time; this refuses to ship one at all.
+          expect(Object.keys(step.where ?? {}).length, "a `set` step must be bounded").toBeGreaterThan(0);
+          for (const col of Object.keys(step.set ?? {})) {
+            // NOT a hub rule — the hub encrypts a SET value like any other
+            // write, and an app is free to set an encrypted text column this
+            // way. It is a rule about THIS app's columns: everything a
+            // retraction touches here is a flag or a stamp that the app's own
+            // queries compare on (`WHERE is_cancelled = 0`). A value bound as
+            // a string into a column the codec encrypts would store ciphertext
+            // in a 0/1 flag — every such comparison would stop matching, and
+            // the entry the retraction meant to hide would stay visible.
+            const plain =
+              manifest.db_encryption === "off" ||
+              /(_id|_at|_date|_by)$/.test(col) ||
+              (manifest.db_plaintext_columns ?? []).includes(col);
+            expect(plain, `${step.table}.${col} is compared by this app but would be encrypted`).toBe(true);
+          }
+        }
+      });
     });
   }
+
+  // ── no insert-only dated action ──────────────────────────────────────────
+  //
+  // The calendar used to expose a second action that inserted an entry keyed
+  // only on the triggering event's id. That id is fresh on every publish, so
+  // the row it made had no identity for the THING: an edit landed a second
+  // entry beside the first, and nothing could ever move or retract either.
+  //
+  // It was removed rather than left alongside the upsert, because it was the
+  // TRAP choice — plainest title, fewest params, listed first — and it only
+  // misbehaves on the second publish, so a publisher wiring it up sees it work.
+  // This test stops one growing back.
+  it("exposes no dated action that cannot move or retract what it creates", () => {
+    for (const [id, action] of Object.entries(manifest.automation_actions ?? {})) {
+      for (const step of action.steps) {
+        if (step.op !== "insert") continue;
+        const writesADate = ["start_date", "end_date"].some((c) => c in (step.values ?? {}));
+        if (!writesADate) continue;
+        expect(
+          step.on_conflict && typeof step.on_conflict === "object",
+          `${id} inserts a dated entry but cannot update one — give it an on_conflict on a source reference`,
+        ).toBe(true);
+        expect(
+          action.params.source_ref_id?.required,
+          `${id} must require source_ref_id, or the entry it makes can never be found again`,
+        ).toBe(true);
+      }
+    }
+  });
+
+  // ── retraction ───────────────────────────────────────────────────────────
+  //
+  // The counterpart to upsert_dated_event. It is deliberately SOFT: nothing is
+  // deleted, so no attendee list, no child row, and no hub file is lost when a
+  // publisher calls its thing off. These tests pin the properties that make it
+  // safe to expose at all, because the manifest is the whole security boundary
+  // — the hub will run whatever recipe this file declares as trusted SQL.
+  describe("retract_dated_event", () => {
+    const action = manifest.automation_actions?.retract_dated_event;
+    const step = action?.steps[0];
+
+    it("is a single soft `set` step, never a delete", () => {
+      expect(action.steps).toHaveLength(1);
+      expect(step.op).toBe("set");
+    });
+
+    it("hides the entry using the column the app's own reads already filter on", () => {
+      // If this flag and the one in the glance/agenda queries ever diverge, the
+      // retraction would run, report success, and change nothing visible.
+      expect(step.set.is_cancelled).toBe("1");
+      const glance = JSON.stringify(manifest.glance ?? {});
+      expect(glance).toContain("is_cancelled = 0");
+    });
+
+    it("is scoped to exactly the one entry the source app made", () => {
+      // source_ref_id carries a plain UNIQUE index (005_source_ref.sql), so
+      // this can match at most one row. Any looser predicate — a date, a title
+      // — would retract other publishers' entries alongside it.
+      expect(step.where).toEqual({ source_ref_id: ":source_ref_id" });
+      expect(action.params.source_ref_id.required).toBe(true);
+    });
+
+    it("does not touch the entry's identity or its reference", () => {
+      // The row must stay upsert-addressable: if a household turns the
+      // reminder back on, upsert_dated_event has to find this same row and
+      // revive it rather than append a second one beside it.
+      for (const col of ["id", "source_ref_id", "source_event_id"]) {
+        expect(step.set[col], `a retraction must not rewrite ${col}`).toBeUndefined();
+      }
+    });
+
+    it("is reversible — a later announcement un-hides the same entry", () => {
+      // Retraction is not final. A household that switches a reminder back on,
+      // or a cancelled subscription they resubscribe to, publishes a fresh
+      // upcoming event; that upserts onto this same source_ref_id. Unless the
+      // upsert CLEARS the flag, the revived row keeps the value the retraction
+      // wrote and the entry is invisible forever — a dead row nothing can
+      // reach, since the household never sees it to fix it by hand.
+      const upsert = manifest.automation_actions.upsert_dated_event.steps[0];
+      expect(upsert.values.is_cancelled).toBe("0");
+      expect(upsert.on_conflict.update).toContain("is_cancelled");
+    });
+  });
 
   it("suggestions that target this app name a declared action", () => {
     for (const s of manifest.suggested_automations ?? []) {
