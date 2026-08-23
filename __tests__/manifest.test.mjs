@@ -413,6 +413,33 @@ describe.skipIf(!manifest.automation_actions)("automation_actions match the migr
     });
   });
 
+  /**
+   * `create_event` was this app's original automation action and was removed on
+   * 2026-08-23. It deduped on `$event_id`, which is fresh on every publish, so
+   * the row it wrote had no identity for the *thing* it represented — only for
+   * the announcement. A source app that re-announced the same appointment
+   * landed a second entry beside the first, and nothing could later move or
+   * retract either one.
+   *
+   * It is worth a guard rather than trusting the deletion to stick, because it
+   * was the trap choice: plainest title, fewest params, and it misbehaves only
+   * on the *second* publish, so it tests clean and reads as the obvious default.
+   * `upsert_dated_event` has inherited its plain name; a future "just add a
+   * simple create action" would recreate the same hazard under the old one.
+   */
+  it("does not resurrect create_event — dedupe on $event_id has no identity for the thing", () => {
+    expect(manifest.automation_actions.create_event).toBeUndefined();
+    for (const [id, action] of Object.entries(manifest.automation_actions ?? {})) {
+      if (action.dedupe?.column !== "source_event_id") continue;
+      const step = action.steps.find((s) => s.op === "insert");
+      expect(
+        step?.on_conflict?.columns,
+        `"${id}" dedupes on a per-publish id, so it needs an on_conflict key naming the thing itself`,
+      ).toBeTruthy();
+      expect(step.on_conflict.columns).toContain("source_ref_id");
+    }
+  });
+
   it("suggestions that target this app name a declared action", () => {
     for (const s of manifest.suggested_automations ?? []) {
       if (s.target_app_id !== manifest.id) continue;
