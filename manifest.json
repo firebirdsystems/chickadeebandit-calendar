@@ -1,7 +1,7 @@
 {
   "id": "calendar",
   "name": "Calendar",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Family calendar with manual event creation, recurring events, and series editing. Shows month and agenda views. Merges in events synced from Google Calendar and Apple Calendar. Filter by family member, see who's busy each day, and get warned about scheduling conflicts.",
   "entrypoint": "index.html",
   "runtime": "static",
@@ -158,6 +158,43 @@
         "title": { "kind": "payload_field", "value": "title" },
         "event_date": { "kind": "payload_field", "value": "reveal_date" },
         "source_ref_id": { "kind": "payload_field", "value": "source_ref_id" }
+      }
+    },
+    {
+      "title": "Put a trip on the calendar",
+      "description": "Starting a trip in the trip planner puts its first day on the shared calendar, so the dates are visible to everyone before the planning is done.",
+      "trigger_event": "trip.created",
+      "target_app_id": "calendar",
+      "action_id": "create_event",
+      "param_map": {
+        "title": { "kind": "payload_field", "value": "title" },
+        "event_date": { "kind": "payload_field", "value": "start_date" },
+        "description": { "kind": "payload_field", "value": "destination" },
+        "source_ref_id": { "kind": "subject_id" }
+      }
+    },
+    {
+      "title": "Put amenity reservations on the calendar",
+      "description": "Reserving the clubhouse or the courts puts the date on the shared calendar, so the booking shows up where the household already looks.",
+      "trigger_event": "amenity.reserved",
+      "target_app_id": "calendar",
+      "action_id": "create_event",
+      "param_map": {
+        "title": { "kind": "payload_field", "value": "amenity" },
+        "event_date": { "kind": "payload_field", "value": "date" },
+        "source_ref_id": { "kind": "subject_id" }
+      }
+    },
+    {
+      "title": "Put assigned shifts on the calendar",
+      "description": "A shift assignment lands on the shared calendar as an all-day entry, so a duty day is visible next to everything else that day holds.",
+      "trigger_event": "shift.assigned",
+      "target_app_id": "calendar",
+      "action_id": "create_event",
+      "param_map": {
+        "title": { "kind": "payload_field", "value": "shift_type" },
+        "event_date": { "kind": "payload_field", "value": "date" },
+        "source_ref_id": { "kind": "subject_id" }
       }
     }
   ],
