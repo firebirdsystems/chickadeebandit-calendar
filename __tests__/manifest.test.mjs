@@ -332,36 +332,85 @@ describe.skipIf(!manifest.automation_actions)("automation_actions match the migr
 
   // ── no insert-only dated action ──────────────────────────────────────────
   //
-  // The calendar used to expose a second action that inserted an entry keyed
-  // only on the triggering event's id. That id is fresh on every publish, so
-  // the row it made had no identity for the THING: an edit landed a second
-  // entry beside the first, and nothing could ever move or retract either.
-  //
-  // It was removed rather than left alongside the upsert, because it was the
-  // TRAP choice — plainest title, fewest params, listed first — and it only
-  // misbehaves on the second publish, so a publisher wiring it up sees it work.
-  // This test stops one growing back.
+  /**
+   * An action that inserts an entry keyed only on the triggering event's id has
+   * no identity for the THING: that id is fresh on every publish, so an edit
+   * lands a second entry beside the first and nothing can ever move or retract
+   * either. Every dated insert must therefore carry `source_ref_id` and an
+   * `on_conflict` on it.
+   *
+   * `source_ref_id` is declared OPTIONAL, and that is not an oversight to be
+   * tidied up into `required: true`. Requiredness is evaluated against rules
+   * that were saved before the param existed: coerceParam rejects an unmapped
+   * required param, so flipping this flag stops every pre-existing rule dead
+   * with `skipped_missing`, permanently and silently. Optional-and-unmapped
+   * binds NULL instead, SQLite treats NULLs in a UNIQUE index as distinct, and
+   * the legacy rule keeps inserting exactly as it always did.
+   *
+   * What can be enforced without that cost is the pair below: the column is
+   * always written and is always the conflict key (so anyone who DOES supply a
+   * ref gets a movable, retractable entry), and every suggestion we ship maps
+   * it (so no rule created from this manifest is born without one).
+   */
+  function datedInsertActions() {
+    return Object.entries(manifest.automation_actions ?? {}).flatMap(([id, action]) =>
+      action.steps
+        .filter((step) => step.op === "insert"
+          && ["start_date", "end_date"].some((c) => c in (step.values ?? {})))
+        .map((step) => [id, action, step]));
+  }
+
   it("exposes no dated action that cannot move or retract what it creates", () => {
-    for (const [id, action] of Object.entries(manifest.automation_actions ?? {})) {
-      for (const step of action.steps) {
-        if (step.op !== "insert") continue;
-        const writesADate = ["start_date", "end_date"].some((c) => c in (step.values ?? {}));
-        if (!writesADate) continue;
-        expect(
-          step.on_conflict && typeof step.on_conflict === "object",
-          `${id} inserts a dated entry but cannot update one — give it an on_conflict on a source reference`,
-        ).toBe(true);
-        expect(
-          action.params.source_ref_id?.required,
-          `${id} must require source_ref_id, or the entry it makes can never be found again`,
-        ).toBe(true);
-      }
+    const dated = datedInsertActions();
+    expect(dated.length, "expected at least one dated insert to check").toBeGreaterThan(0);
+    for (const [id, action, step] of dated) {
+      expect(
+        step.on_conflict && typeof step.on_conflict === "object",
+        `${id} inserts a dated entry but cannot update one — give it an on_conflict on a source reference`,
+      ).toBe(true);
+      expect(
+        step.on_conflict.columns,
+        `${id} must key its upsert on source_ref_id, or the entry it makes can never be found again`,
+      ).toEqual(["source_ref_id"]);
+      expect(
+        step.values.source_ref_id,
+        `${id} must actually write source_ref_id, or the conflict key is always NULL`,
+      ).toBe(":source_ref_id");
+      expect(
+        action.params.source_ref_id,
+        `${id} must declare source_ref_id so a rule can supply one`,
+      ).toBeDefined();
+      // Not `required` — see above. Asserted explicitly so a future tidy-up
+      // has to delete this line and read why.
+      expect(
+        action.params.source_ref_id.required,
+        `${id}.source_ref_id must stay optional — required breaks every rule saved before it existed`,
+      ).toBe(false);
+      expect(
+        action.params.source_ref_id.default,
+        `${id}.source_ref_id must have no default — "" would collide every un-referenced row onto one`,
+      ).toBeUndefined();
+    }
+  });
+
+  it("maps source_ref_id in every suggestion that creates a dated entry", () => {
+    // The enforcement `required: true` cannot safely do. A shipped suggestion
+    // is the one path where we control the param_map, so a rule born here is
+    // never born without a reference.
+    const datedIds = new Set(datedInsertActions().map(([id]) => id));
+    const suggestions = (manifest.suggested_automations ?? []).filter((s) => datedIds.has(s.action_id));
+    expect(suggestions.length, "expected suggestions using the dated action").toBeGreaterThan(0);
+    for (const s of suggestions) {
+      expect(
+        s.param_map?.source_ref_id,
+        `suggestion "${s.title}" creates a dated entry with no source_ref_id — it could never be retracted`,
+      ).toBeDefined();
     }
   });
 
   // ── retraction ───────────────────────────────────────────────────────────
   //
-  // The counterpart to upsert_dated_event. It is deliberately SOFT: nothing is
+  // The counterpart to create_event's upsert. It is deliberately SOFT: nothing is
   // deleted, so no attendee list, no child row, and no hub file is lost when a
   // publisher calls its thing off. These tests pin the properties that make it
   // safe to expose at all, because the manifest is the whole security boundary
@@ -393,7 +442,7 @@ describe.skipIf(!manifest.automation_actions)("automation_actions match the migr
 
     it("does not touch the entry's identity or its reference", () => {
       // The row must stay upsert-addressable: if a household turns the
-      // reminder back on, upsert_dated_event has to find this same row and
+      // reminder back on, create_event's upsert has to find this same row and
       // revive it rather than append a second one beside it.
       for (const col of ["id", "source_ref_id", "source_event_id"]) {
         expect(step.set[col], `a retraction must not rewrite ${col}`).toBeUndefined();
@@ -407,28 +456,40 @@ describe.skipIf(!manifest.automation_actions)("automation_actions match the migr
       // upsert CLEARS the flag, the revived row keeps the value the retraction
       // wrote and the entry is invisible forever — a dead row nothing can
       // reach, since the household never sees it to fix it by hand.
-      const upsert = manifest.automation_actions.upsert_dated_event.steps[0];
+      const upsert = manifest.automation_actions.create_event.steps[0];
       expect(upsert.values.is_cancelled).toBe("0");
       expect(upsert.on_conflict.update).toContain("is_cancelled");
     });
   });
 
   /**
-   * `create_event` was this app's original automation action and was removed on
-   * 2026-08-23. It deduped on `$event_id`, which is fresh on every publish, so
-   * the row it wrote had no identity for the *thing* it represented — only for
-   * the announcement. A source app that re-announced the same appointment
-   * landed a second entry beside the first, and nothing could later move or
-   * retract either one.
+   * `create_event` originally deduped on `$event_id` alone, which is fresh on
+   * every publish: the row it wrote had identity for the ANNOUNCEMENT but none
+   * for the thing announced. A source app that re-announced the same
+   * appointment landed a second entry beside the first, and nothing could
+   * later move or retract either one. `source_ref_id` + `on_conflict` is the
+   * fix, and this guards it for every action, not just that one.
    *
-   * It is worth a guard rather than trusting the deletion to stick, because it
-   * was the trap choice: plainest title, fewest params, and it misbehaves only
-   * on the *second* publish, so it tests clean and reads as the obvious default.
-   * `upsert_dated_event` has inherited its plain name; a future "just add a
-   * simple create action" would recreate the same hazard under the old one.
+   * A previous version of this test asserted `create_event` was DELETED, and
+   * that was the wrong lesson to draw. The action id is not a name in this
+   * manifest — it is a foreign key. Every household's saved automation rule
+   * stores the string, and the dispatcher resolves it against whatever the
+   * manifest says today (automations.ts, `Object.hasOwn(actions, ...)`), with
+   * no alias and no migration. Renaming it therefore does not deprecate the
+   * old action; it orphans every rule already written against it, silently,
+   * one collapsed run at a time. So the id stays and the SHAPE changes, which
+   * is what actually needed fixing. Guard the shape.
    */
-  it("does not resurrect create_event — dedupe on $event_id has no identity for the thing", () => {
-    expect(manifest.automation_actions.create_event).toBeUndefined();
+  it("keeps create_event's id stable — it is a foreign key from saved rules, not a label", () => {
+    // Renaming this breaks every household that already automated onto it.
+    expect(manifest.automation_actions.create_event).toBeDefined();
+    for (const s of manifest.suggested_automations ?? []) {
+      if (s.target_app_id !== "calendar") continue;
+      expect(manifest.automation_actions[s.action_id], `suggestion targets missing action "${s.action_id}"`).toBeDefined();
+    }
+  });
+
+  it("gives every per-publish dedupe an identity for the thing itself", () => {
     for (const [id, action] of Object.entries(manifest.automation_actions ?? {})) {
       if (action.dedupe?.column !== "source_event_id") continue;
       const step = action.steps.find((s) => s.op === "insert");

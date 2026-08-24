@@ -1,5 +1,5 @@
 -- Automations put dated rows from other apps onto the calendar
--- (manifest.automation_actions.upsert_dated_event).
+-- (manifest.automation_actions.create_event).
 --
 -- `source_event_id` records which app event produced the row. The dispatcher's
 -- dedupe guard reads it before running an action (SELECT 1 ... WHERE

@@ -14,13 +14,23 @@
 -- UI writes, and for automation rules that don't supply one — SQLite treats
 -- NULLs as distinct in a UNIQUE index, so any number of rows may omit it.
 --
+-- Those NULLs are also the migration boundary, and it is one-way: an entry an
+-- automation made BEFORE its source app started supplying a reference has no
+-- key, so `retract_dated_event` can never find it. There is no backfill to
+-- write — the calendar holds the event id that created the row, not the id of
+-- the thing in the other app it was about, and nothing recovers the second
+-- from the first. Pre-existing entries outlive their source forever and have
+-- to be deleted by hand; only entries made from this version on can be taken
+-- back down. Both the action description and the suggested rules that use it
+-- say so, because the person adding the rule is the one who needs to know.
+--
 -- The `_id` suffix is load-bearing: the app-db codec leaves those columns
 -- plaintext, and an encrypted column cannot carry a UNIQUE index or be matched
 -- by ON CONFLICT.
 ALTER TABLE app_calendar__events ADD COLUMN source_ref_id TEXT;
 
 -- UNIQUE, not a plain index: it is the ON CONFLICT target of the
--- upsert_dated_event action, and SQLite only accepts a conflict target backed
+-- create_event action's upsert form, and SQLite only accepts a conflict target backed
 -- by a unique constraint. Deliberately NOT partial (`WHERE source_ref_id IS NOT
 -- NULL`) even though that would be tighter — ON CONFLICT matches a partial
 -- index only when the target restates its predicate, which the dispatcher's
