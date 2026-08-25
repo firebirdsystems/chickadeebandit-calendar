@@ -1,7 +1,7 @@
 {
   "id": "calendar",
   "name": "Calendar",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Family calendar with manual event creation, recurring events, and series editing. Shows month and agenda views. Merges in events synced from Google Calendar and Apple Calendar. Filter by family member, see who's busy each day, and get warned about scheduling conflicts.",
   "entrypoint": "index.html",
   "runtime": "static",
@@ -194,6 +194,28 @@
       "param_map": {
         "title": { "kind": "payload_field", "value": "shift_type" },
         "event_date": { "kind": "payload_field", "value": "date" },
+        "source_ref_id": { "kind": "subject_id" }
+      }
+    },
+    {
+      "title": "Put RSVP events on the calendar",
+      "description": "An event opened for RSVPs shows up on the shared calendar the day it happens, so people who never open the RSVP app still see it coming.",
+      "trigger_event": "event.created",
+      "target_app_id": "calendar",
+      "action_id": "create_event",
+      "param_map": {
+        "title": { "kind": "payload_field", "value": "title" },
+        "event_date": { "kind": "payload_field", "value": "event_date" },
+        "source_ref_id": { "kind": "subject_id" }
+      }
+    },
+    {
+      "title": "Take cancelled RSVP events off the calendar",
+      "description": "The other half of the rule above. When the event is cancelled in the RSVP app, the calendar entry it made stops showing \u2014 rather than leaving a date up for something that is not happening. Add both, or the entry outlives the event.",
+      "trigger_event": "event.cancelled",
+      "target_app_id": "calendar",
+      "action_id": "retract_dated_event",
+      "param_map": {
         "source_ref_id": { "kind": "subject_id" }
       }
     }
