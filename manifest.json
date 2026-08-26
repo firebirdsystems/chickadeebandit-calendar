@@ -225,6 +225,9 @@
     "requires_approval": false
   },
   "storage": "db",
+  "preload": {
+    "events": {"sql": "SELECT * FROM app_calendar__events WHERE source = 'local' ORDER BY start_date"}
+  },
   "capture_consumer": { "kinds": ["event"], "via": "structured" },
   "nav": {
     "label": "Calendar"
