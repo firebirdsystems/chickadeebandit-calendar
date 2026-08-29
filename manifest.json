@@ -102,7 +102,7 @@
       ]
     }
   },
-  "db_plaintext_columns": ["is_cancelled"],
+  "db_plaintext_columns": ["is_cancelled", "color"],
   "suggested_automations": [
     {
       "title": "Put elder-care appointments on the calendar",

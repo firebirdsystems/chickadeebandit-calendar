@@ -1,6 +1,6 @@
 {
   "name": "chickadee-app-calendar",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Calendar app for Family Hub",
   "type": "module",
   "scripts": {
