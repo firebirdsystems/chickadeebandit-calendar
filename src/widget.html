@@ -67,9 +67,14 @@
 </head>
 <body>
 <script type="module">
+import { hubToday } from "/hub-sdk.js";
+
 const DB     = window.__DB_URL ?? "";
 const APP_ID = "calendar";
-const TODAY  = new Date().toISOString().slice(0, 10);
+// The household's day, matching the `:today` this app's glance binds. The
+// widget document gets the hub bootstrap (window.__HOUSEHOLD_TZ) the same as
+// index.html does, so the two surfaces cannot disagree about which day it is.
+const TODAY  = hubToday();
 
 function esc(s) {
   return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
@@ -102,8 +107,8 @@ function fmtTime(t) {
 function fmtDay(dateStr) {
   const d = new Date(dateStr + "T00:00:00");
   if (dateStr === TODAY) return "Today";
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrow = new Date(TODAY + "T00:00:00Z");
+  tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
   if (dateStr === tomorrow.toISOString().slice(0,10)) return "Tomorrow";
   return d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
 }
