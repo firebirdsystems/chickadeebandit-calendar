@@ -435,6 +435,14 @@ const IS_ROSTER = window.__SPACE_KIND === "roster";
 // hub enforces this server-side (owner_or_visibility + steward_writes_only on
 // `events`); this only hides controls that would 403.
 const canWrite = !IS_ROSTER || IS_ADMIN;
+// Hiding a synced event is HOUSEHOLD-WIDE and, today, permanent — the row is
+// keyed on event_id alone and nothing in the app deletes it again. That makes it
+// an adult action, and `hidden_synced_events` is now adult_writable so the rule
+// is enforced rather than merely observed. The control is gated to match: left
+// visible it would be a button that throws and rolls its own optimistic update
+// back. (A per-member hide, or any unhide at all, would both be improvements —
+// see the note on this table.)
+const canHideSynced = canWrite && isAdult(ME);
 
 const EVENTS = window.__EVENTS_URL ?? "";
 
@@ -993,7 +1001,7 @@ function showEvent(evId, dateStr, primaryId, occDate) {
     <div class="modal-actions">
       ${!isSynced && canWrite ? `<button class="btn btn-ghost" data-testid="event-edit" onclick="closeModal();_editCurrent()">Edit</button>
       <button class="btn btn-danger btn-sm" data-testid="event-delete" onclick="closeModal();_deleteCurrent()">Delete</button>` : ""}
-      ${ev.source === "synced" ? `<button class="btn btn-ghost btn-sm" data-testid="event-hide" onclick="_hideEvByKey(${_evDetailKey})">Hide</button>` : ""}
+      ${ev.source === "synced" && canHideSynced ? `<button class="btn btn-ghost btn-sm" data-testid="event-hide" onclick="_hideEvByKey(${_evDetailKey})">Hide</button>` : ""}
       <button class="btn btn-ghost" data-testid="event-detail-dismiss" onclick="closeModal()">Close</button>
     </div>`, "event-detail");
 }

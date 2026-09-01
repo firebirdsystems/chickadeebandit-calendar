@@ -31,6 +31,9 @@
     ]
   },
   "row_policies": {
+    "hidden_synced_events": {
+      "kind": "adult_writable"
+    },
     "events": {
       "kind": "owner_or_visibility",
       "member_column": "created_by",
