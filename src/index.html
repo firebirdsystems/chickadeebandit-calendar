@@ -414,7 +414,7 @@
 </div>
 
 <script type="module">
-import { memberColor, initial, esc, isAdult, hubConfirm, searchMatch } from "/hub-sdk.js";
+import { memberColor, initial, esc, isAdult, hubConfirm, searchMatch, hubToday } from "/hub-sdk.js";
 import {
   MONTHS, MONTHS_SHORT, DAYS_SHORT, DAYS_ABBR, DAY_NAMES, EVENT_COLORS,
   p2, toDateStr, parseLD, addDaysObj, addDayStr, todayStr, daysBetween, getWeekStart,
@@ -527,9 +527,9 @@ async function loadSyncedEvents() {
     const normalizeBase = ev => ({
       id: ev.id ?? crypto.randomUUID(), title: ev.title ?? ev.summary ?? "Event",
       description: ev.description ?? "", location: ev.location ?? "",
-      start_date: normalizeDate(ev.start ?? ev.startAt ?? ev.start_at ?? ev.start_date ?? ev.date ?? ev.scheduled_at),
+      start_date: normalizeDate(ev.start ?? ev.startAt ?? ev.start_at ?? ev.start_date ?? ev.date ?? ev.scheduled_at, hubToday()),
       start_time: normalizeTime(ev.start ?? ev.startAt ?? ev.start_at ?? ev.scheduled_at),
-      end_date: normalizeDate(ev.end ?? ev.endAt ?? ev.end_at ?? ev.end_date ?? ev.date ?? ev.scheduled_at),
+      end_date: normalizeDate(ev.end ?? ev.endAt ?? ev.end_at ?? ev.end_date ?? ev.date ?? ev.scheduled_at, hubToday()),
       end_time: normalizeTime(ev.end ?? ev.endAt ?? ev.end_at), all_day: (ev.all_day ?? ev.allDay) ? 1 : 0,
       color: "#6b7280", organizer_id: (ev.member_ids?.[0]) ?? ev.familyMemberId ?? ev.family_member_id ?? null,
       calendar_name: ev.calendarName ?? ev.calendar_name ?? null,
