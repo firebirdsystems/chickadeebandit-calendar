@@ -119,10 +119,10 @@ async function load() {
     `SELECT id, title, start_date, start_time, all_day, color
      FROM app_calendar__events
      WHERE start_date >= ? AND is_cancelled = 0
-     -- start_time is encrypted at rest: IS NULL still works (a NULL stays a
-     -- NULL), but comparing its value orders ciphertext, so clock-time order is
-     -- applied below, after the hub decrypts.
-     ORDER BY start_date ASC, CASE WHEN start_time IS NULL THEN 0 ELSE 1 END
+     -- start_time is plaintext (_time suffix), so it orders as clock time.
+     -- NULL sorts first, which is the all-day-first rule the CASE used to
+     -- spell out, so the per-day sort below is now belt and braces.
+     ORDER BY start_date ASC, start_time ASC
      LIMIT 15`,
     [TODAY]
   );

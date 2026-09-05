@@ -1,10 +1,10 @@
 -- The events table shipped with no indexes at all, so every read was a full
 -- scan — including the glance query, which runs on every hub homepage load.
 --
--- Only plaintext columns are indexable here: start_time/end_time/recurrence are
--- encrypted at rest (not covered by the platform skip-list, and this app
--- declares no db_plaintext_columns), so an index on them would order ciphertext.
--- start_date (_date suffix), source, and the numeric is_cancelled are plaintext.
+-- Only plaintext columns are indexable here. At the time this shipped that
+-- excluded start_time/end_time; the platform skip-list has since picked up the
+-- _time suffix, and 006 adds the (is_cancelled, start_date, start_time) index
+-- this one could not. `recurrence` is still encrypted and still unindexable.
 
 -- Glance (is_cancelled = 0 AND start_date >= :today ORDER BY start_date) and
 -- events_this_week (same shape, bounded window) both drive off this.

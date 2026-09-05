@@ -515,10 +515,15 @@ async function initDb() {
   // Schema is managed by hub migrations (migrations/001_init.sql)
 }
 async function loadLocalEvents() {
-  // start_time is encrypted at rest, so only start_date can be ordered in SQL;
-  // within-day order has to be applied here, after the hub decrypts. Nulls
-  // (all-day events) sort first, matching the widget.
-  const { rows } = await db(`SELECT * FROM app_calendar__events WHERE source = 'local' ORDER BY start_date`);
+  // start_time is plaintext (_time suffix), so SQL already returns within-day
+  // clock order, all-day events first (NULL sorts first). This statement must
+  // stay byte-identical to manifest.preload.events or the preload stops
+  // matching and the app pays a round-trip on first render.
+  //
+  // The sort below still earns its place: remote events are merged into
+  // localEvents afterwards, so the combined list needs re-ordering by the same
+  // rule the SQL applies.
+  const { rows } = await db(`SELECT * FROM app_calendar__events WHERE source = 'local' ORDER BY start_date, start_time`);
   localEvents = (rows ?? []).sort((a, b) =>
     (a.start_date ?? "").localeCompare(b.start_date ?? "")
     || (a.start_time == null ? 0 : 1) - (b.start_time == null ? 0 : 1)

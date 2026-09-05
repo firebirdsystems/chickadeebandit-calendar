@@ -17,6 +17,7 @@ FROM app_calendar__events
 WHERE is_cancelled  = 0
 -- end_date is a household-local calendar date. CURRENT_DATE is UTC.
   AND end_date     >= :today
--- start_time is encrypted at rest, so ordering it here would sort ciphertext.
-ORDER BY start_date
+-- start_time is plaintext (_time suffix), so within-day clock order is correct
+-- here. NULL sorts first, putting all-day events at the top of each day.
+ORDER BY start_date, start_time
 LIMIT 100
