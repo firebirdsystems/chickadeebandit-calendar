@@ -1181,11 +1181,16 @@ window.submitCreate = async function() {
       [id, data.title, data.description, data.location, data.start_date, data.start_time, data.end_date, data.end_time,
        data.all_day, data.color, ME?.id ?? null, data.attendee_ids, data.recurrence, ME?.id ?? null, now, now]
     );
+    // member_id repeats created_by because the hub's roster attribution reads
+    // member_id and nothing else: without it the event is attributed to its
+    // subject (the event row id), which is not a member row, so a roster peer
+    // never sees a steward's calendar event. Contract CI enforces the pairing.
     await publishEvent("calendar.event_created", id, {
       title: data.title,
       start_date: data.start_date,
       all_day: data.all_day === 1,
       created_by: ME?.id ?? "unknown",
+      member_id: ME?.id ?? "unknown",
     });
   } catch {
     localEvents = localEvents.filter(e => e.id !== id);
