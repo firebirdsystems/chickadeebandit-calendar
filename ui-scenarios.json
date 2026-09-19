@@ -50,6 +50,85 @@
         { "action": "expectText", "text": "Maple Street", "selector": "[data-testid=\"event-detail\"]" },
         { "action": "expectVisible", "selector": "[data-testid=\"event-delete\"]" }
       ]
+    },
+    {
+      "name": "dragging an event down the time grid writes its new time",
+      "members": { "member": "adult" },
+      "steps": [
+        {
+          "action": "seedRaw",
+          "sql": "INSERT INTO app_calendar__events (id, title, start_date, start_time, end_date, end_time, all_day, visibility, source, created_by, created_at, updated_at) VALUES (?, ?, date('now'), '09:00', date('now'), '10:00', 0, 'everyone', 'local', ?, datetime('now'), datetime('now'))",
+          "params": ["ui-drag-move", "Standup", "{{member}}"]
+        },
+
+        { "action": "open" },
+        { "action": "waitFor", "selector": "[data-testid=\"timegrid-event\"]" },
+
+        { "action": "click", "selector": "[data-testid=\"timegrid-event\"]" },
+        { "action": "waitFor", "selector": "[data-testid=\"event-detail\"]" },
+        { "action": "expectText", "text": "9 AM \u2013 10 AM", "selector": "[data-testid=\"event-detail\"]" },
+        { "action": "click", "selector": "[data-testid=\"event-detail-dismiss\"]" },
+
+        { "action": "drag", "selector": "[data-testid=\"timegrid-event\"]", "byY": 112 },
+
+        { "action": "reload" },
+        { "action": "waitFor", "selector": "[data-testid=\"timegrid-event\"]" },
+        { "action": "click", "selector": "[data-testid=\"timegrid-event\"]" },
+        { "action": "waitFor", "selector": "[data-testid=\"event-detail\"]" },
+        { "action": "expectText", "text": "11 AM \u2013 12 PM", "selector": "[data-testid=\"event-detail\"]" },
+        { "action": "expectNoText", "text": "9 AM \u2013 10 AM", "selector": "[data-testid=\"event-detail\"]" }
+      ]
+    },
+    {
+      "name": "dragging an event's bottom edge writes a longer duration",
+      "members": { "member": "adult" },
+      "steps": [
+        {
+          "action": "seedRaw",
+          "sql": "INSERT INTO app_calendar__events (id, title, start_date, start_time, end_date, end_time, all_day, visibility, source, created_by, created_at, updated_at) VALUES (?, ?, date('now'), '09:00', date('now'), '10:00', 0, 'everyone', 'local', ?, datetime('now'), datetime('now'))",
+          "params": ["ui-drag-resize", "Piano lesson", "{{member}}"]
+        },
+
+        { "action": "open" },
+        { "action": "waitFor", "selector": "[data-testid=\"timegrid-event\"]" },
+
+        { "action": "click", "selector": "[data-testid=\"timegrid-event\"]" },
+        { "action": "waitFor", "selector": "[data-testid=\"event-detail\"]" },
+        { "action": "expectText", "text": "9 AM \u2013 10 AM", "selector": "[data-testid=\"event-detail\"]" },
+        { "action": "click", "selector": "[data-testid=\"event-detail-dismiss\"]" },
+
+        { "action": "drag", "selector": "[data-testid=\"tg-resize-end\"]", "byY": 56 },
+
+        { "action": "reload" },
+        { "action": "waitFor", "selector": "[data-testid=\"timegrid-event\"]" },
+        { "action": "click", "selector": "[data-testid=\"timegrid-event\"]" },
+        { "action": "waitFor", "selector": "[data-testid=\"event-detail\"]" },
+        { "action": "expectText", "text": "9 AM \u2013 11 AM", "selector": "[data-testid=\"event-detail\"]" },
+        { "action": "expectNoText", "text": "9 AM \u2013 10 AM", "selector": "[data-testid=\"event-detail\"]" }
+      ]
+    },
+    {
+      "name": "a recurring occurrence offers no drag affordance and a plain event does",
+      "members": { "member": "adult" },
+      "steps": [
+        {
+          "action": "seedRaw",
+          "sql": "INSERT INTO app_calendar__events (id, title, start_date, start_time, end_date, end_time, all_day, visibility, source, created_by, created_at, updated_at) VALUES (?, ?, date('now'), '09:00', date('now'), '10:00', 0, 'everyone', 'local', ?, datetime('now'), datetime('now'))",
+          "params": ["ui-drag-plain", "Standup", "{{member}}"]
+        },
+        {
+          "action": "seedRaw",
+          "sql": "INSERT INTO app_calendar__events (id, title, start_date, start_time, end_date, end_time, all_day, recurrence, visibility, source, created_by, created_at, updated_at) VALUES (?, ?, date('now'), '14:00', date('now'), '15:00', 0, ?, 'everyone', 'local', ?, datetime('now'), datetime('now'))",
+          "params": ["ui-drag-series", "Yoga", "{\"freq\":\"weekly\",\"interval\":1}", "{{member}}"]
+        },
+
+        { "action": "open" },
+        { "action": "waitFor", "selector": "[data-testid=\"time-grid\"]" },
+
+        { "action": "expectCount", "selector": "[data-testid=\"timegrid-event\"]", "count": 2 },
+        { "action": "expectCount", "selector": "[data-testid=\"timegrid-event\"][data-drag-id]", "count": 1 },
+        { "action": "expectCount", "selector": "[data-testid=\"timegrid-event\"]:not([data-drag-id])", "count": 1 }
+      ]
     }
   ]
 }

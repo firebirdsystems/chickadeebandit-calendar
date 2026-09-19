@@ -42,7 +42,7 @@
       padding: 7px 14px; border-radius: 8px; font-size: 0.82rem;
       font-weight: 600; cursor: pointer; border: none; transition: opacity .15s;
     }
-    .btn-primary { background: var(--accent); color: white; }
+    .btn-primary { background: var(--accent); color: var(--accent-fg); }
     .btn-primary:hover { opacity: .88; }
     .btn-ghost { background: transparent; border: 1.5px solid var(--border); color: var(--muted); }
     .btn-ghost:hover { border-color: var(--text); color: var(--text); }
@@ -58,7 +58,7 @@
       padding: 6px 12px; border: none; background: transparent;
       font-size: 0.82rem; font-weight: 600; cursor: pointer; color: var(--muted);
     }
-    .view-toggle button.active { background: var(--accent); color: white; }
+    .view-toggle button.active { background: var(--accent); color: var(--accent-fg); }
 
     /* ── Month grid ──────────────────────────────────────── */
     .cal-grid {
@@ -71,7 +71,7 @@
       font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
       letter-spacing: .05em; color: var(--muted);
       border-bottom: 1px solid var(--border);
-      background: #f9fafb;
+      background: var(--bg);
     }
     .cal-cell {
       min-height: 90px; padding: 4px;
@@ -81,8 +81,8 @@
       transition: background .1s;
     }
     .cal-cell:nth-child(7n) { border-right: none; }
-    .cal-cell:hover { background: #f3f4f6; }
-    .cal-cell.other-month { background: #fafafa; }
+    .cal-cell:hover { background: var(--bg); }
+    .cal-cell.other-month { background: var(--bg); }
     .cal-cell.today { background: var(--today-bg); }
     .cal-day-num {
       font-size: 0.78rem; font-weight: 600; color: var(--muted);
@@ -143,7 +143,7 @@
     }
     .tg-header {
       display: flex; border-bottom: 2px solid var(--border);
-      background: #f9fafb; flex-shrink: 0;
+      background: var(--bg); flex-shrink: 0;
     }
     .tg-gutter {
       width: 52px; flex-shrink: 0;
@@ -168,7 +168,7 @@
 
     .tg-allday-bar {
       display: flex; border-bottom: 1px solid var(--border);
-      background: #fafafa; flex-shrink: 0; min-height: 24px;
+      background: var(--bg); flex-shrink: 0; min-height: 24px;
     }
     .tg-allday-lbl {
       width: 52px; flex-shrink: 0; font-size: .6rem; color: var(--muted);
@@ -200,7 +200,7 @@
     .tg-col {
       flex: 1; position: relative;
       border-right: 1px solid var(--border);
-      background: white;
+      background: var(--card);
     }
     .tg-col:last-child { border-right: none; }
     .tg-col.tg-today { background: #fafff8; }
@@ -225,6 +225,54 @@
     .tg-ev-title { font-size: .7rem; font-weight: 700; color: white; line-height: 1.3; }
     .tg-ev-time  { font-size: .62rem; color: rgba(255,255,255,.85); }
 
+    /* ── Drag & resize ───────────────────────────────────────
+       Only events isDraggableEvent() accepts get these — a read-only or
+       synced event keeps the plain pointer so the affordance never promises
+       a write the row policy will refuse. */
+    /* pan-y, not none: the time grid scrolls vertically, and a dense day is
+       mostly event boxes. Taking the gesture outright would leave a finger
+       landing on an event unable to scroll at all. The long press below is
+       what separates "scrolling" from "dragging"; until it lands the browser
+       keeps the gesture. */
+    .tg-ev.draggable { cursor: grab; touch-action: pan-y; }
+    .tg-ev.dragging {
+      cursor: grabbing; opacity: 1; z-index: 5;
+      box-shadow: 0 4px 12px rgba(0,0,0,.28);
+    }
+    .tg-ev.armed { box-shadow: 0 0 0 2px var(--accent-fg), 0 0 0 4px rgba(0,0,0,.35); }
+    /* The handles DO take the gesture: they are 8px targets deliberately aimed
+       at, never somewhere a scroll starts, and a resize that needed a long
+       press first would feel broken. */
+    .tg-ev-handle {
+      position: absolute; left: 0; right: 0; height: 8px;
+      cursor: ns-resize; touch-action: none; z-index: 2;
+    }
+    .tg-ev-handle-top { top: -1px; }
+    .tg-ev-handle-bot { bottom: -1px; }
+    /* A grab bar, shown on hover so it does not clutter a dense week. It is
+       decorative only: the 8px hit area above is always live, including on
+       touch, where there is no hover to reveal anything. */
+    .tg-ev-handle::after {
+      content: ""; position: absolute; left: 50%; transform: translateX(-50%);
+      top: 3px; width: 24px; height: 2px; border-radius: 2px;
+      background: rgba(255,255,255,.75); opacity: 0; transition: opacity .1s;
+    }
+    .tg-ev:hover .tg-ev-handle::after, .tg-ev.dragging .tg-ev-handle::after { opacity: 1; }
+    /* Live readout of where the drop would land, pinned to the box. */
+    .tg-ev-ghost-time {
+      position: absolute; top: 2px; right: 4px; z-index: 3;
+      font-size: .62rem; font-weight: 700; color: white;
+      background: rgba(0,0,0,.45); border-radius: 3px; padding: 0 4px;
+      white-space: nowrap; pointer-events: none;
+    }
+    .tg-drag-error {
+      position: fixed; left: 50%; transform: translateX(-50%); bottom: 24px;
+      z-index: 60; max-width: 90vw;
+      background: #7f1d1d; color: white; font-size: .8rem;
+      padding: 8px 14px; border-radius: var(--radius);
+      box-shadow: 0 4px 14px rgba(0,0,0,.3);
+    }
+
     .tg-now-line {
       position: absolute; left: 0; right: 0; height: 2px;
       background: #ef4444; z-index: 2;
@@ -242,7 +290,7 @@
     }
     @media (min-width: 600px) { .day-panel-backdrop { align-items: center; padding: 20px; } }
     .day-panel {
-      background: white; border-radius: var(--radius) var(--radius) 0 0;
+      background: var(--card); border-radius: var(--radius) var(--radius) 0 0;
       width: 100%; max-width: 500px; padding: 20px;
       max-height: 75vh; overflow-y: auto;
     }
@@ -266,7 +314,7 @@
     }
     @media (min-width: 600px) { .modal-backdrop { align-items: center; padding: 20px; } }
     .modal {
-      background: white; border-radius: var(--radius) var(--radius) 0 0;
+      background: var(--card); border-radius: var(--radius) var(--radius) 0 0;
       width: 100%; max-width: 540px; padding: 22px;
       max-height: 94vh; overflow-y: auto;
     }
@@ -282,7 +330,7 @@
     .form-input, .form-select, .form-textarea {
       width: 100%; border: 1.5px solid var(--border); border-radius: 7px;
       padding: 8px 11px; font-size: 0.9rem; outline: none; font-family: inherit;
-      transition: border-color .15s; background: white;
+      transition: border-color .15s; background: var(--card);
     }
     .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--accent); }
     .form-textarea { resize: vertical; min-height: 60px; }
@@ -315,7 +363,7 @@
       border: 1.5px solid var(--border); cursor: pointer;
       font-size: 0.72rem; font-weight: 700; color: var(--muted); background: transparent;
     }
-    .day-toggle.selected { border-color: var(--accent); background: var(--accent); color: white; }
+    .day-toggle.selected { border-color: var(--accent); background: var(--accent); color: var(--accent-fg); }
 
     .scope-option {
       display: flex; align-items: center; gap: 10px;
@@ -337,7 +385,7 @@
     .toggle-switch { position: relative; width: 40px; height: 22px; }
     .toggle-switch input { opacity: 0; width: 0; height: 0; }
     .toggle-slider { position: absolute; inset: 0; background: var(--border); border-radius: 22px; cursor: pointer; transition: .2s; }
-    .toggle-slider:before { content: ""; position: absolute; height: 16px; width: 16px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: .2s; }
+    .toggle-slider:before { content: ""; position: absolute; height: 16px; width: 16px; left: 3px; bottom: 3px; background: var(--card); border-radius: 50%; transition: .2s; }
     .toggle-switch input:checked + .toggle-slider { background: var(--accent); }
     .toggle-switch input:checked + .toggle-slider:before { transform: translateX(18px); }
 
@@ -422,6 +470,8 @@ import {
   normalizeDate, normalizeTime,
   describeRecurrence, advanceCursor,
   memberIdsOf, findMemberConflicts, searchableFields,
+  eventSpanMins, applyMove, applyResize, isDraggableEvent,
+  createPendingDrags,
 } from "./logic.js";
 
 const CONTEXT = window.__CONTEXT_URL ?? "";
@@ -479,6 +529,16 @@ let searchQ = "";       // in-app search (see logic.js searchableFields)
 let pivot        = new Date();
 let modalEl      = null;
 let panelEl      = null;
+/**
+ * Drag writes that have not settled yet. See createPendingDrags in logic.js
+ * for what the registry guarantees and why it lives there — every concurrency
+ * defect this feature had was in that bookkeeping, and untestable while it was
+ * entangled with the DOM.
+ *
+ * Declared here with the rest of the module state rather than beside the drag
+ * handlers, so loadLocalEvents — defined well above them — can read it.
+ */
+const pendingDrags = createPendingDrags();
 
 const HOUR_H = 56; // px per hour in time grid
 
@@ -514,7 +574,27 @@ async function dbBatch(statements) {
 async function initDb() {
   // Schema is managed by hub migrations (migrations/001_init.sql)
 }
-async function loadLocalEvents() {
+/**
+ * Put back the optimistic positions a wholesale re-read is about to discard.
+ *
+ * Every full reload replaces localEvents with what the database currently
+ * holds, which for an event whose own drag write is still in flight is its OLD
+ * position. Nothing reapplies it when that write later succeeds, so the grid
+ * would sit stale until the next load — and there are several reloads, not
+ * one: a failed drag's authoritative refresh, a recurring edit, a recurring
+ * delete. Hence this lives inside loadLocalEvents rather than at any of its
+ * call sites, where the next reload added would quietly miss it.
+ */
+function withPendingDrags(rows, exceptId) {
+  return pendingDrags.apply(rows, exceptId);
+}
+
+/**
+ * @param exceptId  An event whose stored row should win over its pending
+ *                  patch — the one being authoritatively re-read after its
+ *                  own write turned out not to apply.
+ */
+async function loadLocalEvents(exceptId = null) {
   // start_time is plaintext (_time suffix), so SQL already returns within-day
   // clock order, all-day events first (NULL sorts first). This statement must
   // stay byte-identical to manifest.preload.events or the preload stops
@@ -524,7 +604,9 @@ async function loadLocalEvents() {
   // localEvents afterwards, so the combined list needs re-ordering by the same
   // rule the SQL applies.
   const { rows } = await db(`SELECT * FROM app_calendar__events WHERE source = 'local' ORDER BY start_date, start_time`);
-  localEvents = (rows ?? []).sort((a, b) =>
+  // Patched BEFORE the sort: a restored patch changes start_time, and
+  // localEvents is expected to be in the order the SQL asked for.
+  localEvents = withPendingDrags(rows ?? [], exceptId).sort((a, b) =>
     (a.start_date ?? "").localeCompare(b.start_date ?? "")
     || (a.start_time == null ? 0 : 1) - (b.start_time == null ? 0 : 1)
     || (a.start_time ?? "").localeCompare(b.start_time ?? "")
@@ -724,7 +806,7 @@ function renderMonth() {
     const pillsHtml = show.map(ev => {
       const timeStr = ev.all_day ? "" : `<span class="ev-time">${fmtTime(ev.start_time)}</span>`;
       return `<span class="ev-pill${ev.source==="synced"?" synced":ev.source==="cross-app"?" cross-app":""}" style="background:${esc(ev.color)}"
-        data-testid="event-pill" data-event-id="${ev.id}" data-date="${ds}"
+        data-testid="event-pill" data-event-id="${esc(ev.id)}" data-date="${ds}"
         onclick="event.stopPropagation();_showEvByKey(${_regEv(ev,ds)})"
         title="${esc(ev.title)}">${timeStr}${esc(ev.title)}</span>`;
     }).join("");
@@ -764,7 +846,7 @@ function renderTimeGrid(dates) {
     const dayEvs = allDayByDate[ds] ?? [];
     const rows = dayEvs.slice(0,2).map(ev =>
       `<div class="tg-allday-ev" style="background:${esc(ev.color)}"
-        data-testid="allday-event" data-event-id="${ev.id}" data-date="${ds}"
+        data-testid="allday-event" data-event-id="${esc(ev.id)}" data-date="${ds}"
         onclick="_showEvByKey(${_regEv(ev,ds)})"
         title="${esc(ev.title)}">${esc(ev.title)}</div>`
     ).join("");
@@ -803,17 +885,29 @@ function renderTimeGrid(dates) {
     const nCols = cols.length || 1;
 
     const evHtml = cols.flatMap((col, ci) => col.map(ev => {
-      const startM = timeToMins(ev.start_time) ?? 0;
-      const endM   = timeToMins(ev.end_time) ?? (startM + 60);
+      // Same span the drag math reads — see eventSpanMins. A second copy of
+      // this rule here is how the renderer and the drag handlers came to
+      // disagree about an inverted end_time.
+      const { start: startM, end: endM } = eventSpanMins(ev);
       const top    = (startM / 60) * HOUR_H;
       const height = Math.max(((endM - startM) / 60) * HOUR_H - 2, 18);
       const w = `${90 / nCols}%`;
       const l = `${(ci * 90 / nCols) + 2}%`;
       const showTime = height > 30;
-      return `<div class="tg-ev" style="top:${top}px;height:${height}px;background:${esc(ev.color)};width:${w};left:${l}"
-        data-testid="timegrid-event" data-event-id="${ev.id}" data-date="${ds}"
+      // Resize handles eat 16px of a box's vertical hit area. Below ~34px that
+      // leaves nothing to grab for a move, so a short event is move-only and
+      // resizing it means opening the form.
+      const drag = isDraggableEvent(ev, { canWrite });
+      const handles = drag && height > 34
+        ? `<div class="tg-ev-handle tg-ev-handle-top" data-testid="tg-resize-start" data-drag-edge="start"></div>
+           <div class="tg-ev-handle tg-ev-handle-bot" data-testid="tg-resize-end" data-drag-edge="end"></div>`
+        : "";
+      return `<div class="tg-ev${drag ? " draggable" : ""}" style="top:${top}px;height:${height}px;background:${esc(ev.color)};width:${w};left:${l}"
+        data-testid="timegrid-event" data-event-id="${esc(ev.id)}" data-date="${ds}"
+        ${drag ? `data-drag-id="${esc(ev.id)}"` : ""}
         onclick="_showEvByKey(${_regEv(ev,ds)})"
         title="${esc(ev.title)}">
+        ${handles}
         <div class="tg-ev-title">${esc(ev.title)}</div>
         ${showTime ? `<div class="tg-ev-time">${fmtTime(ev.start_time)}</div>` : ""}
       </div>`;
@@ -851,7 +945,345 @@ function renderTimeGrid(dates) {
   if (scrollEl) {
     const scrollTo = dates.includes(today) ? Math.max(nowTop - 80, 0) : 7 * HOUR_H;
     scrollEl.scrollTop = scrollTo;
+    // render() replaces #root wholesale, so the listeners go with it and are
+    // re-attached here rather than delegated from a longer-lived ancestor.
+    attachTimeGridDrag(scrollEl);
   }
+}
+
+// ─── Time-grid drag & resize ──────────────────────────────────────────────
+// Phase 1: vertical only — a drag changes the time of day, never the date.
+// Cross-day drag, the all-day row, and recurring occurrences are deliberately
+// out (see isDraggableEvent for why each one needs more than this code does).
+
+const DRAG_THRESHOLD_PX = 4;   // mouse: a few px of jitter is still a click
+const TOUCH_ARM_MS      = 400; // touch: long-press to arm
+const TOUCH_CANCEL_PX   = 8;   // touch: movement before arming is a scroll
+
+let dragState = null;
+
+function attachTimeGridDrag(scrollEl) {
+  scrollEl.addEventListener("pointerdown", onDragPointerDown);
+}
+
+/**
+ * Suppress the click a completed drag ends in.
+ *
+ * The event box carries an inline onclick that opens the detail modal, and a
+ * drop still produces a click. Capture phase on window runs before that inline
+ * handler — and before the optimistic re-render can detach the box it was
+ * bound to, which is why this listens on window rather than on the grid.
+ *
+ * The listener is torn down on the next macrotask, so it can only ever eat the
+ * click belonging to THIS gesture. A flag cleared on a timer instead swallowed
+ * whatever click came next, which after a fast drop-then-click was a real
+ * click on a different event.
+ */
+function swallowNextClick() {
+  const swallow = (e) => { e.stopPropagation(); e.preventDefault(); };
+  window.addEventListener("click", swallow, true);
+  setTimeout(() => window.removeEventListener("click", swallow, true), 0);
+}
+
+function onDragPointerDown(e) {
+  if (e.button > 0) return;              // right / middle click is not a drag
+  if (dragState) {
+    // A stray second pointer. abandonDrag() may re-render to undo the first
+    // drag's preview, which replaces #root — so `e.target` is now detached.
+    // closest() still walks a detached tree quite happily, and continuing
+    // would capture this pointer on an orphaned box: a drag with no visible
+    // preview that still persists a move on release. Give this gesture up.
+    abandonDrag();
+    return;
+  }
+  const box = e.target.closest?.(".tg-ev[data-drag-id]");
+  if (!box) return;
+  const ev = localEvents.find(x => x.id === box.dataset.dragId);
+  // Re-checked against the row rather than trusted from the markup: a reload
+  // between render and grab could have turned this into something unmovable.
+  if (!ev || !isDraggableEvent(ev, { canWrite })) return;
+  if (pendingDrags.has(ev.id)) return;   // its last drag has not settled yet
+
+  const edge = e.target.closest(".tg-ev-handle")?.dataset.dragEdge ?? null;
+  dragState = {
+    box, ev, edge,
+    pointerId: e.pointerId,
+    startY: e.clientY,
+    // A mouse press is unambiguous, and so is grabbing a resize handle — an
+    // 8px bar is aimed at, never somewhere a scroll starts, and its CSS has
+    // already taken the gesture. A touch on the body of the box is ambiguous:
+    // the same swipe scrolls the grid, so it waits for a long press.
+    active: e.pointerType === "mouse" || Boolean(edge),
+    moved: false,
+    patch: null,
+    armTimer: null,
+  };
+
+  if (dragState.active) {
+    capturePointer(box, e.pointerId);
+  } else {
+    dragState.armTimer = setTimeout(() => {
+      if (!dragState) return;
+      dragState.active = true;
+      dragState.box.classList.add("armed");
+      capturePointer(dragState.box, dragState.pointerId);
+      navigator.vibrate?.(8);
+    }, TOUCH_ARM_MS);
+  }
+
+  window.addEventListener("pointermove", onDragPointerMove);
+  window.addEventListener("pointerup", onDragPointerUp);
+  window.addEventListener("pointercancel", onDragPointerCancel);
+  // preventDefault() on a pointermove does not reliably stop a scroll the
+  // browser has already claimed under touch-action: pan-y — touchmove is the
+  // event that does, and only while non-passive. Registered for the life of
+  // the gesture rather than globally so the grid scrolls normally otherwise.
+  window.addEventListener("touchmove", onDragTouchMove, { passive: false });
+}
+
+/** Suppress the scroll once a drag has actually taken the gesture. */
+function onDragTouchMove(e) {
+  if (dragState?.active && dragState.moved && e.cancelable) e.preventDefault();
+}
+
+function capturePointer(box, pointerId) {
+  try { box.setPointerCapture(pointerId); } catch { /* capture is an optimization */ }
+}
+
+function onDragPointerMove(e) {
+  if (!dragState || e.pointerId !== dragState.pointerId) return;
+  // Something else re-rendered mid-gesture — another event's drag settling, a
+  // recurring edit completing — and #root, with it this box, was replaced.
+  // Previewing into a detached node is invisible, and dropping one would
+  // persist a move against a grid the member can no longer see. The fresh
+  // render already shows the truth, so this just ends quietly.
+  if (!dragState.box.isConnected) { endDrag(); return; }
+  const dy = e.clientY - dragState.startY;
+
+  if (!dragState.active) {
+    // Moving before the long press lands means this was a scroll all along.
+    if (Math.abs(dy) > TOUCH_CANCEL_PX) abandonDrag();
+    return;
+  }
+  if (!dragState.moved && Math.abs(dy) < DRAG_THRESHOLD_PX) return;
+
+  dragState.moved = true;
+  dragState.box.classList.add("dragging");
+  if (e.cancelable) e.preventDefault();
+
+  const { ev, edge } = dragState;
+  dragState.patch = edge ? applyResize(ev, edge, dy, HOUR_H) : applyMove(ev, dy, HOUR_H);
+  previewDrag(dragState.box, dragState.patch);
+}
+
+/**
+ * Draw where the drop would land.
+ *
+ * Positioned from the PATCH rather than from the raw pointer, so the box
+ * visibly snaps to the quarter hour as it moves and what the member sees while
+ * dragging is exactly what gets written.
+ */
+function previewDrag(box, patch) {
+  const { start, end } = eventSpanMins(patch);
+  box.style.top    = `${(start / 60) * HOUR_H}px`;
+  box.style.height = `${Math.max(((end - start) / 60) * HOUR_H - 2, 18)}px`;
+  let label = box.querySelector(".tg-ev-ghost-time");
+  if (!label) {
+    label = document.createElement("div");
+    label.className = "tg-ev-ghost-time";
+    label.dataset.testid = "tg-drag-time";
+    box.appendChild(label);
+  }
+  label.textContent = `${fmtTime(patch.start_time)} – ${fmtTime(patch.end_time)}`;
+}
+
+function onDragPointerUp(e) {
+  if (!dragState || e.pointerId !== dragState.pointerId) return;
+  const { moved, patch, ev, box } = dragState;
+  endDrag();
+  // Same reason as the move handler: a drop onto a grid that no longer exists
+  // is not a drop the member made against what they were looking at.
+  if (!box.isConnected) return;
+  if (!moved || !patch) return;
+  swallowNextClick();
+  commitDrag(ev, patch);
+}
+
+/**
+ * A cancelled pointer is an ABANDONED drag, not a dropped one.
+ *
+ * The browser emits pointercancel when it takes the gesture over for itself —
+ * a scroll it decided to own, a system gesture, the touch interrupted by a
+ * call. The member never let go anywhere. Routed through onDragPointerUp this
+ * would persist whatever position the preview had reached and reschedule an
+ * event nobody meant to move.
+ */
+function onDragPointerCancel(e) {
+  if (!dragState || e.pointerId !== dragState.pointerId) return;
+  abandonDrag();
+}
+
+/**
+ * End a drag that will not be persisted, and undo what it drew.
+ *
+ * previewDrag() writes straight to the box's inline top/height, so a drag
+ * dropped on the floor leaves the event sitting at a position nothing has
+ * saved. Every path that gives up on a gesture goes through here — a cancelled
+ * pointer, and a second pointer arriving mid-drag.
+ */
+function abandonDrag() {
+  // Only worth a re-render if a preview is actually still on screen: a box
+  // that has already been replaced by someone else's render has nothing left
+  // to undo, and rendering again would be pure churn.
+  const previewed = Boolean(dragState?.moved) && dragState.box.isConnected;
+  endDrag();
+  if (previewed) renderPreservingScroll();
+}
+
+function endDrag() {
+  if (!dragState) return;
+  const { box, armTimer, pointerId } = dragState;
+  if (armTimer) clearTimeout(armTimer);
+  try { box.releasePointerCapture(pointerId); } catch { /* already released */ }
+  box.classList.remove("dragging", "armed");
+  box.querySelector(".tg-ev-ghost-time")?.remove();
+  dragState = null;
+  window.removeEventListener("pointermove", onDragPointerMove);
+  window.removeEventListener("pointerup", onDragPointerUp);
+  window.removeEventListener("pointercancel", onDragPointerCancel);
+  window.removeEventListener("touchmove", onDragTouchMove, { passive: false });
+}
+
+/**
+ * Re-render without throwing the grid back to its default scroll position.
+ *
+ * renderTimeGrid scrolls to now (or 7am) every time it builds, which is right
+ * when the member navigates and wrong when a drag redraws under their hands:
+ * dropping an afternoon event in a week that is not this one would scroll it
+ * straight out of view.
+ */
+function renderPreservingScroll() {
+  const top = document.getElementById("tg-scroll")?.scrollTop;
+  render();
+  if (top === undefined) return;
+  const el = document.getElementById("tg-scroll");
+  if (el) el.scrollTop = top;
+}
+
+/**
+ * Wait for an in-flight drag write on this event to settle, so no other
+ * mutation of the same row is ever in flight beside it.
+ */
+const settlePendingDrag = (id) => pendingDrags.settle(id);
+
+/** Run a drag's write under registration. */
+function commitDrag(ev, patch) {
+  return pendingDrags.run(ev.id, (entry) => runDragCommit(ev, patch, entry));
+}
+
+async function runDragCommit(ev, patch, entry) {
+  // Hoisted: the catch-all at the bottom needs it to undo an optimistic move
+  // that a failure outside the write itself left on screen.
+  let restore = null;
+  try {
+    // The same attendee-conflict check the edit form runs. Without it the
+    // identical schedule change is stopped for confirmation through Edit and
+    // waved through by a drag.
+    const conflicts = findConflictsFor({ ...ev, ...patch }, new Set([ev.id]));
+    if (conflicts.length) {
+      const ok = await hubConfirm("Schedule conflict", {
+        description: describeConflicts(conflicts),
+        confirmLabel: "Move anyway",
+      });
+      if (!ok) {
+        // Nothing was written, but the box is still where the preview left it.
+        renderPreservingScroll();
+        return;
+      }
+    }
+
+    const now = new Date().toISOString();
+    // Only this row's prior times, not a snapshot of the whole array: a
+    // wholesale restore would also undo a different event's drag that
+    // succeeded while this one was in flight.
+    const prior = localEvents.find(e => e.id === ev.id);
+    restore = prior
+      ? { start_time: prior.start_time, end_time: prior.end_time, updated_at: prior.updated_at }
+      : null;
+    localEvents = localEvents.map(e => e.id === ev.id ? { ...e, ...patch, updated_at: now } : e);
+    entry.patch = patch;   // now on screen, so worth restoring after a reload
+    renderPreservingScroll();
+    try {
+      // Guarded on the same conditions isDraggableEvent checked: a row a sync
+      // re-sourced or a cancellation retired since the grid was drawn must not
+      // be rewritten by a drag aimed at what it used to be.
+      const { changed } = await db(
+        `UPDATE app_calendar__events SET start_time=?,end_time=?,updated_at=? WHERE id=? AND source='local' AND is_cancelled=0`,
+        [patch.start_time, patch.end_time, now, ev.id],
+      );
+      // A row policy refuses a write by NARROWING the UPDATE's predicate, not
+      // by erroring: a refusal is HTTP 200 with changed: 0, which db() cannot
+      // throw on. Without this the optimistic move stands, looks saved, and
+      // quietly reverts on the next load.
+      //
+      // It is NOT only a refusal, though, and that is why this does not throw
+      // into the rollback below. The predicate also stops matching when the
+      // row is gone, cancelled, or re-sourced by a sync since the grid was
+      // drawn — cases where the local copy the rollback would restore is
+      // itself the stale thing, left on screen and draggable again. The
+      // authoritative rows are the only honest answer to "what happened", so
+      // re-read them.
+      if (DB && !changed) {
+        // This move is not happening. Retire the patch before the await below:
+        // while it is in flight, another event's reload would otherwise call
+        // withPendingDrags and put this failed position back on screen.
+        entry.patch = null;
+        let refreshed = false;
+        // Other events' in-flight drags survive this re-read; this one's does
+        // not, which is what makes it authoritative.
+        try { await loadLocalEvents(ev.id); refreshed = true; } catch { /* fall back below */ }
+        if (!refreshed && restore) {
+          // Better the pre-drag position than the optimistic one, which is the
+          // one position we know is wrong.
+          localEvents = localEvents.map(e => e.id === ev.id ? { ...e, ...restore } : e);
+        }
+        renderPreservingScroll();
+        showDragError(refreshed
+          ? "This event could not be moved. It may have been changed or removed — the calendar has been refreshed."
+          : "This event could not be moved, and the calendar could not be refreshed. Reload to see its current state.");
+        return;
+      }
+    } catch (err) {
+      entry.patch = null;   // failed: never let a reload reapply it
+      if (restore) localEvents = localEvents.map(e => e.id === ev.id ? { ...e, ...restore } : e);
+      renderPreservingScroll();
+      showDragError(err?.message || "This event could not be moved.");
+    }
+  } catch (err) {
+    // This function must never reject. The drop handler does not await it —
+    // it cannot, a drop is not a place to block — so a rejection escaping here
+    // would surface as nothing but an unhandled promise rejection, and
+    // settlePendingDrag's waiters would be left to swallow it too.
+    if (entry.patch && restore) localEvents = localEvents.map(e => e.id === ev.id ? { ...e, ...restore } : e);
+    entry.patch = null;
+    renderPreservingScroll();
+    showDragError(err?.message || "This event could not be moved.");
+  }
+  // No finally: the entry is retired by commitDrag, which owns it.
+}
+
+let dragErrorTimer = null;
+function showDragError(message) {
+  document.getElementById("drag-error")?.remove();
+  const box = document.createElement("div");
+  box.id = "drag-error";
+  box.className = "tg-drag-error";
+  box.dataset.testid = "drag-error";
+  box.setAttribute("role", "status");
+  box.textContent = message;
+  document.body.appendChild(box);
+  clearTimeout(dragErrorTimer);
+  dragErrorTimer = setTimeout(() => box.remove(), 5000);
 }
 
 function renderDay() { renderTimeGrid([toDateStr(pivot)]); }
@@ -897,7 +1329,7 @@ function renderAgenda() {
     const timeStr = ev.all_day ? "All day" : [fmtTime(ev.start_time), fmtTime(ev.end_time)].filter(Boolean).join(" – ");
     const meta = [ev.location, ev.description].filter(Boolean).map(s => s.slice(0,80)).join(" · ");
     html += `<div class="agenda-event${ev.source==="synced"?" synced":ev.source==="cross-app"?" cross-app":""}"
-      data-testid="agenda-event" data-event-id="${ev.id}" data-date="${ev._date}"
+      data-testid="agenda-event" data-event-id="${esc(ev.id)}" data-date="${ev._date}"
       onclick="_showEvByKey(${_regEv(ev,ev._date)})">
       <div class="ev-color-bar" style="background:${esc(ev.color)}"></div>
       <div class="agenda-time">${timeStr}</div>
@@ -934,7 +1366,7 @@ function openDayPanel(dateStr) {
   const isToday = dateStr === todayStr();
   const evRows = evs.map(ev => {
     const timeStr = ev.all_day ? "All day" : fmtTime(ev.start_time) + (ev.end_time ? " – " + fmtTime(ev.end_time) : "");
-    return `<div class="day-panel-event" data-testid="day-panel-event" data-event-id="${ev.id}" onclick="_showEvByKey(${_regEv(ev,dateStr)})">
+    return `<div class="day-panel-event" data-testid="day-panel-event" data-event-id="${esc(ev.id)}" onclick="_showEvByKey(${_regEv(ev,dateStr)})">
       <div style="width:4px;background:${esc(ev.color)};border-radius:2px;flex-shrink:0;align-self:stretch"></div>
       <div class="time">${timeStr}</div>
       <div><div class="ev-title" data-testid="day-panel-event-title">${esc(ev.title)}</div>${ev.location ? `<div class="ev-loc">${esc(ev.location)}</div>` : ""}${avatarStack(ev)}</div>
@@ -1094,20 +1526,39 @@ window.toggleEndFields = function(type) {
 // First save click with attendee conflicts shows a warning and flips the
 // button to "… anyway"; the second click proceeds. Reset on every modal open.
 let conflictAck = false;
-function warnConflicts(data, excludeIds = new Set()) {
-  if (conflictAck) return false;
+/**
+ * Attendees double-booked by a proposed change. Detection only — no DOM — so
+ * the modal warning and the drag confirmation ask the same question of the
+ * same data instead of each deciding for themselves what counts as a clash.
+ */
+function findConflictsFor(data, excludeIds = new Set()) {
   let attendees = [];
   try { attendees = JSON.parse(data.attendee_ids || "[]"); } catch { /* no attendees */ }
-  if (!attendees.length) return false;
+  if (!attendees.length) return [];
   const pool = eventsForRange(data.start_date, data.end_date || data.start_date, { filtered: false });
-  const conflicts = findMemberConflicts(data, attendees, pool, excludeIds);
+  return findMemberConflicts(data, attendees, pool, excludeIds);
+}
+
+/** One conflict as plain text. Escaped by the caller that needs markup. */
+function conflictLine({ event: ev, memberIds }) {
+  const names = memberIds.map(id => members.find(m => m.id === id)?.name ?? "Someone").join(", ");
+  const time = (ev.all_day || !ev.start_time) ? "all day"
+    : [fmtTime(ev.start_time), fmtTime(ev.end_time)].filter(Boolean).join(" – ");
+  return `${names}: ${ev.title} (${fmtDateShort(ev._date ?? ev.start_date)}, ${time})`;
+}
+
+/** The conflict list as the hub confirm dialog's plain-text description. */
+function describeConflicts(conflicts) {
+  const lines = conflicts.slice(0, 4).map(conflictLine);
+  if (conflicts.length > 4) lines.push(`…and ${conflicts.length - 4} more`);
+  return lines.join("\n");
+}
+
+function warnConflicts(data, excludeIds = new Set()) {
+  if (conflictAck) return false;
+  const conflicts = findConflictsFor(data, excludeIds);
   if (!conflicts.length) return false;
-  const items = conflicts.slice(0, 4).map(({ event: ev, memberIds }) => {
-    const names = memberIds.map(id => members.find(m => m.id === id)?.name ?? "Someone").join(", ");
-    const time = (ev.all_day || !ev.start_time) ? "all day"
-      : [fmtTime(ev.start_time), fmtTime(ev.end_time)].filter(Boolean).join(" – ");
-    return `<li>${esc(names)}: ${esc(ev.title)} (${fmtDateShort(ev._date ?? ev.start_date)}, ${time})</li>`;
-  }).join("");
+  const items = conflicts.slice(0, 4).map(c => `<li>${esc(conflictLine(c))}</li>`).join("");
   const extra = conflicts.length > 4 ? `<li>…and ${conflicts.length - 4} more</li>` : "";
   let box = document.getElementById("conflict-warning");
   if (!box) {
@@ -1199,7 +1650,12 @@ window.submitCreate = async function() {
 };
 
 // ─── Edit ─────────────────────────────────────────────────────────────────
-function openEditModal(primaryId, occDate) {
+async function openEditModal(primaryId, occDate) {
+  // A drag writes the same columns this form does. Opening on top of an
+  // unsettled drag would let the form's save land first and be silently
+  // overwritten by the drag arriving after it. Waiting also means the form
+  // opens showing the dragged times rather than the ones it replaced.
+  await settlePendingDrag(primaryId);
   const primary = localEvents.find(e => e.id === primaryId);
   if (!primary) return;
   if (primary.recurrence) openScopeModal("edit", primaryId, occDate);
@@ -1216,6 +1672,10 @@ function openDirectEdit(ev, scope, occDate) {
     </div>`, "event-edit-modal");
 }
 window.submitEdit = async function(primaryId, scope, occDate) {
+  // openEditModal already waited once, but the form stays open across further
+  // interaction. Gating the write itself is what actually holds the invariant:
+  // no mutation of an event proceeds while a drag on it is unresolved.
+  await settlePendingDrag(primaryId);
   const data = collectFormData();
   if (!data.title) { document.getElementById("ef-title").focus(); return; }
   const now = new Date().toISOString();
@@ -1233,7 +1693,13 @@ window.submitEdit = async function(primaryId, scope, occDate) {
       await db(`UPDATE app_calendar__events SET title=?,description=?,location=?,start_date=?,start_time=?,end_date=?,end_time=?,all_day=?,color=?,attendee_ids=?,recurrence=?,updated_at=? WHERE id=?`,
         [data.title,data.description,data.location,data.start_date,data.start_time,data.end_date,data.end_time,data.all_day,data.color,data.attendee_ids,data.recurrence,now,primaryId]);
     } catch {
-      localEvents = prevEvents;
+      // Restored THROUGH the pending-drag registry. Before drags existed every
+      // mutation went through this modal and could not overlap another, so a
+      // wholesale snapshot was a safe undo. A drag on a different event can
+      // now land between this snapshot and this failure, and replaying the
+      // snapshot raw would wipe that move off the screen while its write had
+      // already succeeded.
+      localEvents = withPendingDrags(prevEvents);
       render();
     }
     return;
@@ -1271,6 +1737,8 @@ window.submitEdit = async function(primaryId, scope, occDate) {
 
 // ─── Delete ───────────────────────────────────────────────────────────────
 async function confirmDelete(primaryId, occDate, isRecurring) {
+  // Same reason as openEditModal: never race a pending drag on this row.
+  await settlePendingDrag(primaryId);
   if (isRecurring) openScopeModal("delete", primaryId, occDate);
   else if (await hubConfirm({ message: "Delete this event?", confirmLabel: "Delete", destructive: true })) deleteEvent(primaryId, occDate, "all");
 }
@@ -1288,6 +1756,7 @@ async function hideEvent(id) {
   }
 }
 async function deleteEvent(primaryId, occDate, scope) {
+  await settlePendingDrag(primaryId);   // same invariant as submitEdit
   const now = new Date().toISOString();
   const primary = localEvents.find(e => e.id === primaryId);
   if (!primary) return;
@@ -1300,7 +1769,7 @@ async function deleteEvent(primaryId, occDate, scope) {
     try {
       await db(`DELETE FROM app_calendar__events WHERE id=? OR recurring_event_id=?`, [primaryId, primaryId]);
     } catch {
-      localEvents = prevEvents;
+      localEvents = withPendingDrags(prevEvents);   // same reason as submitEdit
       render();
     }
     return;
