@@ -108,6 +108,32 @@
       ]
     },
     {
+      "name": "dragging an event sideways writes its new date and leaves the time alone",
+      "members": { "member": "adult" },
+      "steps": [
+        {
+          "action": "seedRaw",
+          "sql": "INSERT INTO app_calendar__events (id, title, start_date, start_time, end_date, end_time, all_day, visibility, source, created_by, created_at, updated_at) VALUES (?, ?, date('now','weekday 0','-6 days'), '09:00', date('now','weekday 0','-6 days'), '10:00', 0, 'everyone', 'local', ?, datetime('now'), datetime('now'))",
+          "params": ["ui-drag-day", "Swim club", "{{member}}"]
+        },
+
+        { "action": "open" },
+        { "action": "waitFor", "selector": "[data-testid=\"timegrid-event\"]" },
+        { "action": "expectCount", "selector": "[data-testid=\"timegrid-column\"]:first-child [data-testid=\"timegrid-event\"]", "count": 1 },
+
+        { "action": "drag", "selector": "[data-testid=\"timegrid-event\"]", "byX": 4000 },
+
+        { "action": "reload" },
+        { "action": "waitFor", "selector": "[data-testid=\"timegrid-event\"]" },
+        { "action": "expectCount", "selector": "[data-testid=\"timegrid-event\"]", "count": 1 },
+        { "action": "expectCount", "selector": "[data-testid=\"timegrid-column\"]:first-child [data-testid=\"timegrid-event\"]", "count": 0 },
+
+        { "action": "click", "selector": "[data-testid=\"timegrid-event\"]" },
+        { "action": "waitFor", "selector": "[data-testid=\"event-detail\"]" },
+        { "action": "expectText", "text": "9 AM \u2013 10 AM", "selector": "[data-testid=\"event-detail\"]" }
+      ]
+    },
+    {
       "name": "a recurring occurrence offers no drag affordance and a plain event does",
       "members": { "member": "adult" },
       "steps": [

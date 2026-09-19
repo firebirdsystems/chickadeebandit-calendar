@@ -9,6 +9,9 @@ import {
   SNAP_MINS, DEFAULT_DURATION_MINS,
   minsToTime, snapMins, pxToMins, eventSpanMins, isDraggableSpan, MAX_END_MINS,
   applyMove, applyResize, isDraggableEvent, createPendingDrags,
+  pickColumnDate, applyMoveAcrossDays, autoScrollVelocity, isNoopDragPatch,
+  dragChangesDate,
+  AUTOSCROLL_ZONE_PX, AUTOSCROLL_MAX_PX,
 } from "../src/logic.js";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -744,5 +747,245 @@ describe("createPendingDrags — apply", () => {
     const input = rows();
     pending.apply(input);
     expect(input.find(r => r.id === "b").start_time).toBe("11:00");
+  });
+});
+
+
+// ── Cross-day drag (week view) ────────────────────────────────────────────────
+
+describe("pickColumnDate", () => {
+  // A week's worth of 100px columns starting at x=200, as the grid measures
+  // them: adjacent, so one column's right edge is the next one's left.
+  const cols = ["2026-09-14", "2026-09-15", "2026-09-16"].map((date, i) => ({
+    date, left: 200 + i * 100, right: 300 + i * 100,
+  }));
+
+  it("picks the column the pointer is inside", () => {
+    expect(pickColumnDate(250, cols)).toBe("2026-09-14");
+    expect(pickColumnDate(350, cols)).toBe("2026-09-15");
+    expect(pickColumnDate(450, cols)).toBe("2026-09-16");
+  });
+
+  it("gives a shared edge to the column on its right", () => {
+    // Rects are adjacent, so without a consistent rule the boundary pixel
+    // belongs to two columns and which one wins depends on iteration order.
+    expect(pickColumnDate(300, cols)).toBe("2026-09-15");
+    expect(pickColumnDate(299.9, cols)).toBe("2026-09-14");
+  });
+
+  it("clamps a pointer dragged off either side of the grid", () => {
+    expect(pickColumnDate(0, cols)).toBe("2026-09-14");
+    expect(pickColumnDate(9999, cols)).toBe("2026-09-16");
+  });
+
+  it("has nothing to pick with no columns", () => {
+    expect(pickColumnDate(250, [])).toBe(null);
+    expect(pickColumnDate(250, undefined)).toBe(null);
+  });
+});
+
+describe("applyMoveAcrossDays", () => {
+  const HOUR_H = 56;
+  const ev = timed("09:00", "10:00");   // 2026-09-19
+
+  it("is applyMove with the dates carried through when the day is unchanged", () => {
+    const patch = applyMoveAcrossDays(ev, 56, HOUR_H, "2026-09-19");
+    expect(patch).toEqual({
+      ...applyMove(ev, 56, HOUR_H),
+      start_date: "2026-09-19",
+      end_date: "2026-09-19",
+    });
+  });
+
+  it("treats a null target as the same day", () => {
+    // Day view has one column, and a pointer the grid could not place must
+    // not move the event off its date.
+    expect(applyMoveAcrossDays(ev, 56, HOUR_H, null).start_date).toBe("2026-09-19");
+  });
+
+  it("moves the event to the target day", () => {
+    const patch = applyMoveAcrossDays(ev, 0, HOUR_H, "2026-09-21");
+    expect(patch.start_date).toBe("2026-09-21");
+    expect(patch.end_date).toBe("2026-09-21");
+  });
+
+  it("moves backwards across days too", () => {
+    expect(applyMoveAcrossDays(ev, 0, HOUR_H, "2026-09-16").start_date).toBe("2026-09-16");
+  });
+
+  it("shifts end_date by the same delta as start_date, not to the target", () => {
+    // The distinction only shows on a row whose dates differ. isDraggableEvent
+    // refuses those, so this is about the SHAPE of the operation: a sideways
+    // drag translates an event, it does not re-anchor its end. An
+    // implementation that assigned the target to both would turn a two-day
+    // event into a one-day one, and one that moved only start_date would
+    // manufacture the multi-day row the guard exists to exclude.
+    const twoDay = { ...ev, end_date: "2026-09-20" };
+    const patch = applyMoveAcrossDays(twoDay, 0, HOUR_H, "2026-09-22");
+    expect(patch.start_date).toBe("2026-09-22");
+    expect(patch.end_date).toBe("2026-09-23");
+  });
+
+  it("keeps the duration while changing both day and time", () => {
+    // Deliberately NOT 60 minutes: that is DEFAULT_DURATION_MINS, so an
+    // implementation that dropped the stored end_time and fell back to the
+    // default would still produce the right answer and this would pass.
+    const ninety = timed("09:00", "10:30");
+    const patch = applyMoveAcrossDays(ninety, 2 * HOUR_H, HOUR_H, "2026-09-21");
+    expect(patch).toMatchObject({
+      start_time: "11:00", end_time: "12:30",
+      start_date: "2026-09-21", end_date: "2026-09-21",
+    });
+  });
+
+  it("still clamps the time to the day it lands on", () => {
+    // The vertical clamp is not relaxed by a sideways drag: a fling into
+    // tomorrow's small hours must still park against the last slot rather
+    // than spill past midnight into a third day.
+    const patch = applyMoveAcrossDays(ev, 40 * HOUR_H, HOUR_H, "2026-09-21");
+    expect(patch.end_time).toBe(minsToTime(MAX_END_MINS));
+    expect(patch.start_date).toBe("2026-09-21");
+    expect(patch.end_date).toBe("2026-09-21");
+  });
+
+  it("survives a spring-forward boundary", () => {
+    // daysBetween divides by a fixed 86_400_000 and rounds, and addDayStr uses
+    // setDate — so a 23-hour day has to come back as one whole day, not 0.96
+    // of one. Only bites when the test host is in a DST zone; harmless and
+    // still meaningful elsewhere.
+    const march = { ...ev, start_date: "2026-03-07", end_date: "2026-03-07" };
+    const patch = applyMoveAcrossDays(march, 0, HOUR_H, "2026-03-09");
+    expect(patch.start_date).toBe("2026-03-09");
+    expect(patch.end_date).toBe("2026-03-09");
+  });
+});
+
+describe("autoScrollVelocity", () => {
+  // A 600px-tall scroller, which is taller than 3 * AUTOSCROLL_ZONE_PX so the
+  // zone is the full 48px at each end.
+  const TOP = 100, BOTTOM = 700;
+
+  it("does nothing away from the edges", () => {
+    expect(autoScrollVelocity(400, TOP, BOTTOM)).toBe(0);
+    expect(autoScrollVelocity(TOP + AUTOSCROLL_ZONE_PX, TOP, BOTTOM)).toBe(0);
+    expect(autoScrollVelocity(BOTTOM - AUTOSCROLL_ZONE_PX, TOP, BOTTOM)).toBe(0);
+  });
+
+  it("pulls up near the top and down near the bottom", () => {
+    expect(autoScrollVelocity(TOP + 10, TOP, BOTTOM)).toBeLessThan(0);
+    expect(autoScrollVelocity(BOTTOM - 10, TOP, BOTTOM)).toBeGreaterThan(0);
+  });
+
+  it("ramps with depth into the zone", () => {
+    const shallow = autoScrollVelocity(BOTTOM - 40, TOP, BOTTOM);
+    const deep    = autoScrollVelocity(BOTTOM - 5, TOP, BOTTOM);
+    expect(shallow).toBeGreaterThan(0);
+    expect(deep).toBeGreaterThan(shallow);
+  });
+
+  it("caps at the maximum, however far past the edge the pointer goes", () => {
+    expect(autoScrollVelocity(BOTTOM, TOP, BOTTOM)).toBe(AUTOSCROLL_MAX_PX);
+    expect(autoScrollVelocity(BOTTOM + 500, TOP, BOTTOM)).toBe(AUTOSCROLL_MAX_PX);
+    expect(autoScrollVelocity(TOP, TOP, BOTTOM)).toBe(-AUTOSCROLL_MAX_PX);
+    expect(autoScrollVelocity(TOP - 500, TOP, BOTTOM)).toBe(-AUTOSCROLL_MAX_PX);
+  });
+
+  it("keeps a neutral band on a viewport shorter than two zones", () => {
+    // A fixed 48px zone at each end of a 90px grid would overlap in the
+    // middle and every drag anywhere in it would scroll — in both directions
+    // at once, depending only on which branch was tested first.
+    const shortTop = 0, shortBottom = 90;
+    expect(autoScrollVelocity(45, shortTop, shortBottom)).toBe(0);
+    expect(autoScrollVelocity(1, shortTop, shortBottom)).toBeLessThan(0);
+    expect(autoScrollVelocity(89, shortTop, shortBottom)).toBeGreaterThan(0);
+  });
+
+  it("does nothing for a collapsed viewport", () => {
+    expect(autoScrollVelocity(10, 100, 100)).toBe(0);
+    expect(autoScrollVelocity(10, 100, 50)).toBe(0);
+  });
+});
+
+
+describe("isNoopDragPatch", () => {
+  const ev = timed("09:00", "10:00");
+
+  it("is a no-op when the gesture landed back where it started", () => {
+    expect(isNoopDragPatch(ev, applyMove(ev, 0, 56))).toBe(true);
+    expect(isNoopDragPatch(ev, applyMoveAcrossDays(ev, 0, 56, ev.start_date))).toBe(true);
+    // Under half a snap in either direction rounds back to the same slot.
+    expect(isNoopDragPatch(ev, applyMove(ev, 5, 56))).toBe(true);
+    expect(isNoopDragPatch(ev, applyMove(ev, -5, 56))).toBe(true);
+  });
+
+  it("is not a no-op for a real move, resize or day change", () => {
+    expect(isNoopDragPatch(ev, applyMove(ev, 56, 56))).toBe(false);
+    expect(isNoopDragPatch(ev, applyResize(ev, "end", 56, 56))).toBe(false);
+    expect(isNoopDragPatch(ev, applyMoveAcrossDays(ev, 0, 56, "2026-09-21"))).toBe(false);
+  });
+
+  it("is not a no-op when it materializes a missing end_time", () => {
+    // The row stores no end; the grid draws an hour. Dropping it in place
+    // writes that hour down for the first time, which is a real change and the
+    // only way a resize handle can exist for such an event at all.
+    const open = timed("09:00");
+    expect(open.end_time).toBe(null);
+    expect(isNoopDragPatch(open, applyMove(open, 0, 56))).toBe(false);
+  });
+
+  it("notices either date moving on its own", () => {
+    // applyMoveAcrossDays always shifts both, so a patch it produced is caught
+    // by whichever half is checked first and the other check never runs. These
+    // are hand-built so each one is actually exercised — without them the
+    // start_date comparison is unreachable and could be deleted unnoticed.
+    const times = { start_time: "09:00", end_time: "10:00" };
+    expect(isNoopDragPatch(ev, { ...times, start_date: "2026-09-21", end_date: ev.end_date })).toBe(false);
+    expect(isNoopDragPatch(ev, { ...times, start_date: ev.start_date, end_date: "2026-09-21" })).toBe(false);
+  });
+
+  it("ignores dates a patch does not carry", () => {
+    // A resize patch has times only. Reading its absent dates as a change
+    // would make every resize look like a day move.
+    expect(isNoopDragPatch(ev, { start_time: "09:00", end_time: "10:00" })).toBe(true);
+  });
+
+  it("treats a missing patch as nothing to write", () => {
+    expect(isNoopDragPatch(ev, null)).toBe(true);
+    expect(isNoopDragPatch(null, applyMove(ev, 56, 56))).toBe(true);
+  });
+});
+
+
+describe("dragChangesDate", () => {
+  const ev = timed("09:00", "10:00");   // 2026-09-19
+
+  it("is false for a resize, which carries no dates at all", () => {
+    // The column list the UPDATE sends is decided by this. A resize that
+    // reported true would send the dates it read at pointerdown, and a day
+    // move someone else made while the finger was down would be undone by a
+    // gesture that only ever meant to change a duration.
+    expect(dragChangesDate(ev, applyResize(ev, "end", 56, 56))).toBe(false);
+    expect(dragChangesDate(ev, applyResize(ev, "start", -56, 56))).toBe(false);
+  });
+
+  it("is false for a move that stayed on its own day", () => {
+    expect(dragChangesDate(ev, applyMoveAcrossDays(ev, 112, 56, ev.start_date))).toBe(false);
+    expect(dragChangesDate(ev, applyMoveAcrossDays(ev, 112, 56, null))).toBe(false);
+  });
+
+  it("is true for a move that crossed to another day", () => {
+    expect(dragChangesDate(ev, applyMoveAcrossDays(ev, 0, 56, "2026-09-21"))).toBe(true);
+    expect(dragChangesDate(ev, applyMoveAcrossDays(ev, 0, 56, "2026-09-16"))).toBe(true);
+  });
+
+  it("notices either date moving on its own", () => {
+    const times = { start_time: "09:00", end_time: "10:00" };
+    expect(dragChangesDate(ev, { ...times, start_date: "2026-09-21", end_date: ev.end_date })).toBe(true);
+    expect(dragChangesDate(ev, { ...times, start_date: ev.start_date, end_date: "2026-09-21" })).toBe(true);
+  });
+
+  it("has nothing to compare without a row or a patch", () => {
+    expect(dragChangesDate(ev, null)).toBe(false);
+    expect(dragChangesDate(null, applyMoveAcrossDays(ev, 0, 56, "2026-09-21"))).toBe(false);
   });
 });

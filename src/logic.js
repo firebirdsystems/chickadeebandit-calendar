@@ -291,6 +291,54 @@ export function applyMove(ev, deltaPx, hourH, snap = SNAP_MINS) {
 }
 
 /**
+ * Which day column a pointer is over.
+ *
+ * `columns` are the grid's day columns in left-to-right order, each
+ * `{ date, left, right }` in viewport coordinates. Measuring them is the DOM's
+ * only contribution to a cross-day drag, so the choice itself stays testable.
+ *
+ * A pointer outside the grid clamps to the nearest edge column rather than
+ * returning nothing: dragging off the side of the week is a gesture toward
+ * that edge, and refusing it there would snap the event back to its own column
+ * for no reason the member can see.
+ */
+export function pickColumnDate(clientX, columns) {
+  if (!columns?.length) return null;
+  for (const col of columns) {
+    if (clientX >= col.left && clientX < col.right) return col.date;
+  }
+  return clientX < columns[0].left ? columns[0].date : columns[columns.length - 1].date;
+}
+
+/**
+ * Move an event to another day as well as another time.
+ *
+ * The time half is applyMove unchanged — the vertical clamp still keeps the
+ * whole event inside whichever day it lands on. The date half shifts
+ * start_date and end_date by the SAME number of days, which is what keeps them
+ * equal for the single-day events isDraggableEvent admits. Shifting only
+ * start_date would manufacture a multi-day event out of a sideways drag, and
+ * multi-day events are precisely what that guard excludes — the drag would
+ * create the row it refuses to move.
+ *
+ * A `targetDate` of null means "same day": day view has one column, and a
+ * pointer the grid cannot place should not move the event off its date. Both
+ * reduce this to applyMove with the dates carried through unchanged.
+ */
+export function applyMoveAcrossDays(ev, deltaPx, hourH, targetDate, snap = SNAP_MINS) {
+  const times = applyMove(ev, deltaPx, hourH, snap);
+  const startDate = ev.start_date;
+  const endDate = ev.end_date ?? startDate;
+  const dayDelta = targetDate && startDate ? daysBetween(startDate, targetDate) : 0;
+  if (!dayDelta) return { ...times, start_date: startDate, end_date: endDate };
+  return {
+    ...times,
+    start_date: addDayStr(startDate, dayDelta),
+    end_date: addDayStr(endDate, dayDelta),
+  };
+}
+
+/**
  * Resize from one edge, holding the other fixed.
  *
  * An event may not collapse past a single snap: dragging the bottom edge above
@@ -311,10 +359,82 @@ export function applyResize(ev, edge, deltaPx, hourH, snap = SNAP_MINS) {
 }
 
 /**
+ * Whether a gesture moved the event to a different day.
+ *
+ * What the drag WRITES is narrowed to this: a resize, and a move that stayed
+ * on its own day, must not send the date columns at all. They would carry the
+ * row as it looked when the gesture began, and a concurrent day move made
+ * while a finger was down would be silently undone by a resize that never
+ * meant to touch a date.
+ *
+ * A patch with no dates cannot have changed them — that is a resize, which
+ * holds the event on its day by construction.
+ */
+export function dragChangesDate(ev, patch) {
+  if (!ev || !patch) return false;
+  return (patch.start_date ?? ev.start_date) !== ev.start_date
+    || (patch.end_date ?? ev.end_date) !== ev.end_date;
+}
+
+/**
+ * Whether a finished gesture would write anything at all.
+ *
+ * A drag that ends within a snap of where it started produces a patch equal to
+ * the row, and committing it costs a round-trip, bumps updated_at, and can pop
+ * the attendee-conflict dialog — all for a nudge the member did not mean as a
+ * move.
+ *
+ * Materializing the default duration is NOT a no-op: an event stored with a
+ * null end_time comes back with one, which is a real change and the whole
+ * reason a resize can grab an edge that was never stored.
+ */
+export function isNoopDragPatch(ev, patch) {
+  if (!ev || !patch) return true;
+  return patch.start_time === ev.start_time
+    && patch.end_time === ev.end_time
+    && (patch.start_date ?? ev.start_date) === ev.start_date
+    && (patch.end_date ?? ev.end_date) === ev.end_date;
+}
+
+/** How close to an edge of the scroller a drag starts pulling it. */
+export const AUTOSCROLL_ZONE_PX = 48;
+/** The fastest that pull gets, in pixels per animation frame. */
+export const AUTOSCROLL_MAX_PX = 14;
+
+/**
+ * How far to scroll the grid this frame, for a pointer at `clientY`.
+ *
+ * Ramps from nothing at the inner edge of the zone to AUTOSCROLL_MAX_PX
+ * against the rim, so a drag parked just inside the zone creeps and one held
+ * hard against the edge moves quickly. Negative scrolls up.
+ *
+ * The zone shrinks to a third of the viewport on a short one. A fixed 48px at
+ * each end of a 100px-tall grid would leave no neutral band between them, and
+ * every drag anywhere in it would scroll.
+ */
+export function autoScrollVelocity(
+  clientY, top, bottom, zone = AUTOSCROLL_ZONE_PX, max = AUTOSCROLL_MAX_PX,
+) {
+  const height = bottom - top;
+  if (height <= 0) return 0;
+  const z = Math.min(zone, height / 3);
+  if (z <= 0) return 0;
+  if (clientY < top + z) {
+    const depth = Math.min(z, top + z - clientY);
+    return -Math.ceil((depth / z) * max);
+  }
+  if (clientY > bottom - z) {
+    const depth = Math.min(z, clientY - (bottom - z));
+    return Math.ceil((depth / z) * max);
+  }
+  return 0;
+}
+
+/**
  * Whether the time grid offers drag/resize for this event.
  *
- * Phase 1 deliberately drags only the simple case. Each exclusion is a write
- * this code could not make correctly:
+ * Only the simple case is draggable. Each exclusion is a write this code could
+ * not make correctly:
  *  - not `canWrite`: the row policy (steward_writes_only in a roster) refuses
  *    the UPDATE as a WHERE-guard, so the drag would appear to work and silently
  *    revert on the next load.
@@ -323,7 +443,8 @@ export function applyResize(ev, edge, deltaPx, hourH, snap = SNAP_MINS) {
  *  - all-day / no start_time: not in the timed grid at all.
  *  - recurring (a rule, or an exception row): moving one occurrence is a
  *    this/following/all decision, not a drag.
- *  - multi-day: the drop would have to move end_date too.
+ *  - multi-day: applyMoveAcrossDays shifts start_date and end_date together,
+ *    which is only the right answer while they are the same day.
  *  - cancelled: the guarded UPDATE excludes it anyway.
  */
 export function isDraggableEvent(ev, { canWrite } = {}) {

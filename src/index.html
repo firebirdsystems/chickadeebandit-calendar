@@ -471,6 +471,8 @@ import {
   describeRecurrence, advanceCursor,
   memberIdsOf, findMemberConflicts, searchableFields,
   eventSpanMins, applyMove, applyResize, isDraggableEvent,
+  applyMoveAcrossDays, pickColumnDate, autoScrollVelocity,
+  isNoopDragPatch, dragChangesDate,
   createPendingDrags,
 } from "./logic.js";
 
@@ -604,7 +606,8 @@ async function loadLocalEvents(exceptId = null) {
   // localEvents afterwards, so the combined list needs re-ordering by the same
   // rule the SQL applies.
   const { rows } = await db(`SELECT * FROM app_calendar__events WHERE source = 'local' ORDER BY start_date, start_time`);
-  // Patched BEFORE the sort: a restored patch changes start_time, and
+  // Patched BEFORE the sort: a restored patch changes start_time and, for a
+  // cross-day drag, start_date — which is the SQL's first sort key — and
   // localEvents is expected to be in the order the SQL asked for.
   localEvents = withPendingDrags(rows ?? [], exceptId).sort((a, b) =>
     (a.start_date ?? "").localeCompare(b.start_date ?? "")
@@ -952,9 +955,14 @@ function renderTimeGrid(dates) {
 }
 
 // ─── Time-grid drag & resize ──────────────────────────────────────────────
-// Phase 1: vertical only — a drag changes the time of day, never the date.
-// Cross-day drag, the all-day row, and recurring occurrences are deliberately
-// out (see isDraggableEvent for why each one needs more than this code does).
+// A drag moves an event in time and, in week view, across days; the resize
+// handles change its duration on its own day. The all-day row and recurring
+// occurrences are still out (see isDraggableEvent for what each one would
+// need beyond this code).
+//
+// Everything that decides what gets WRITTEN lives in logic.js and is unit
+// tested. This file measures the DOM, feeds it those functions, and draws
+// what they return.
 
 const DRAG_THRESHOLD_PX = 4;   // mouse: a few px of jitter is still a click
 const TOUCH_ARM_MS      = 400; // touch: long-press to arm
@@ -1005,10 +1013,32 @@ function onDragPointerDown(e) {
   if (pendingDrags.has(ev.id)) return;   // its last drag has not settled yet
 
   const edge = e.target.closest(".tg-ev-handle")?.dataset.dragEdge ?? null;
+  const scrollEl = e.currentTarget;
+  // One traversal and one rect for the column this event sits in: the vertical
+  // anchor and the horizontal origin below must describe the SAME box.
+  const colEl = box.closest(".tg-col");
+  const colRect = colEl?.getBoundingClientRect();
   dragState = {
     box, ev, edge,
+    scrollEl,
     pointerId: e.pointerId,
     startY: e.clientY,
+    startX: e.clientX,
+    // The column this event lives in, and where its top edge was when the
+    // grab happened. Every later vertical delta is measured against this, so
+    // a grid that moves under a stationary finger moves the event with it.
+    colEl,
+    startColTop: colRect?.top ?? 0,
+    // The day columns, in left-to-right order. Measured once here rather than
+    // on every move: a pointermove that reads layout right after writing the
+    // box's style forces a reflow per frame. They only move on a resize, which
+    // re-measures below.
+    columns: measureDayColumns(scrollEl),
+    originLeft: colRect?.left ?? 0,
+    lastX: e.clientX,
+    lastY: e.clientY,
+    rafId: 0,
+    previewDx: 0,
     // A mouse press is unambiguous, and so is grabbing a resize handle — an
     // 8px bar is aimed at, never somewhere a scroll starts, and its CSS has
     // already taken the gesture. A touch on the body of the box is ambiguous:
@@ -1039,6 +1069,35 @@ function onDragPointerDown(e) {
   // event that does, and only while non-passive. Registered for the life of
   // the gesture rather than globally so the grid scrolls normally otherwise.
   window.addEventListener("touchmove", onDragTouchMove, { passive: false });
+  window.addEventListener("resize", onViewportResize);
+}
+
+/** The day columns as pickColumnDate wants them: `{ date, left, right }`. */
+function measureDayColumns(scrollEl) {
+  return [...scrollEl.querySelectorAll(".tg-col[data-date]")].map(el => {
+    const r = el.getBoundingClientRect();
+    return { date: el.dataset.date, left: r.left, right: r.right };
+  });
+}
+
+/**
+ * The WINDOW resizing mid-gesture — not an event's edge, which everything else
+ * in this section means by "resize".
+ *
+ * Rare on a desktop and routine on a phone, where it is a rotation. It moves
+ * the columns out from under the cached rects, and stale rects would keep
+ * mapping the pointer to the column that used to be there, so the drop lands
+ * on a day the member never pointed at.
+ */
+function onViewportResize() {
+  if (!dragState) return;
+  dragState.columns = measureDayColumns(dragState.scrollEl);
+  // Not startColTop: that is the anchor the vertical delta is measured FROM,
+  // and re-reading it would discard however far the grid has already moved and
+  // jump the event. A reflow that shifts the column is a real movement of the
+  // content under a still pointer, and dragDeltaY is right to count it.
+  dragState.originLeft = dragState.colEl?.getBoundingClientRect().left ?? dragState.originLeft;
+  updateDragPreview();
 }
 
 /** Suppress the scroll once a drag has actually taken the gesture. */
@@ -1058,22 +1117,118 @@ function onDragPointerMove(e) {
   // persist a move against a grid the member can no longer see. The fresh
   // render already shows the truth, so this just ends quietly.
   if (!dragState.box.isConnected) { endDrag(); return; }
-  const dy = e.clientY - dragState.startY;
+  dragState.lastX = e.clientX;
+  dragState.lastY = e.clientY;
+  const dy = dragDeltaY();
 
   if (!dragState.active) {
     // Moving before the long press lands means this was a scroll all along.
+    // dy counts the scroller's own movement too, so a fling that carries the
+    // grid away under a still finger is caught here as well — which is right,
+    // because that is exactly what a scroll is.
     if (Math.abs(dy) > TOUCH_CANCEL_PX) abandonDrag();
     return;
   }
-  if (!dragState.moved && Math.abs(dy) < DRAG_THRESHOLD_PX) return;
+  // A sideways drag is a drag too. Testing only dy meant an event pulled
+  // straight into the next day never passed the threshold and never started.
+  // Only for a MOVE, though: a resize cannot go sideways, so counting
+  // horizontal jitter there would start a gesture that changes nothing.
+  const dx = dragState.edge ? 0 : e.clientX - dragState.startX;
+  if (!dragState.moved && Math.abs(dy) < DRAG_THRESHOLD_PX && Math.abs(dx) < DRAG_THRESHOLD_PX) return;
 
-  dragState.moved = true;
-  dragState.box.classList.add("dragging");
+  if (!dragState.moved) {
+    dragState.moved = true;
+    dragState.box.classList.add("dragging");
+    startAutoScroll();
+  }
   if (e.cancelable) e.preventDefault();
+  updateDragPreview();
+}
 
-  const { ev, edge } = dragState;
-  dragState.patch = edge ? applyResize(ev, edge, dy, HOUR_H) : applyMove(ev, dy, HOUR_H);
-  previewDrag(dragState.box, dragState.patch);
+/**
+ * How far the event has travelled vertically, in grid pixels.
+ *
+ * The pointer's own movement PLUS however far the grid has moved beneath it.
+ * Without the second term the grid slides under a stationary pointer and the
+ * event does not follow: scroll 200px mid-drag and the drop lands 200px —
+ * three and a half hours — from where it looks like it will. That is true of a
+ * wheel and of every auto-scrolled drag below.
+ *
+ * Measured from the COLUMN's own top edge rather than from the scroller's
+ * scrollTop, which is the same cost and answers the question actually being
+ * asked. scrollTop only sees this scroller: once it reaches its end a wheel
+ * chains to the page outside the iframe, which moves the grid just as far
+ * while scrollTop does not change at all. The column's rect moves whatever
+ * the reason — either scroller, or a reflow.
+ */
+function dragDeltaY() {
+  const { colEl, startColTop, startY, lastY } = dragState;
+  const gridShift = colEl?.isConnected ? startColTop - colEl.getBoundingClientRect().top : 0;
+  return (lastY - startY) + gridShift;
+}
+
+/** Left edge of the column for `date`, or null if that day is not on screen. */
+function columnLeftFor(columns, date) {
+  return columns.find(c => c.date === date)?.left ?? null;
+}
+
+/**
+ * Recompute the patch from where the pointer is now, and draw it.
+ *
+ * Reads the pointer position from dragState rather than taking it as an
+ * argument, because the auto-scroll loop needs to redraw on a frame where no
+ * pointer event happened at all — the finger is still, the grid is moving, and
+ * the event has to keep up with it.
+ */
+function updateDragPreview() {
+  if (!dragState?.moved || !dragState.box.isConnected) return;
+  const { ev, edge, box, columns, originLeft, lastX } = dragState;
+  const dy = dragDeltaY();
+
+  // A resize holds the event on its own day. Dragging an edge sideways is not
+  // a meaningful gesture, and honouring it would let one drag change both the
+  // duration and the date.
+  if (edge) {
+    dragState.patch = applyResize(ev, edge, dy, HOUR_H);
+    previewDrag(box, dragState.patch, 0, false);
+    return;
+  }
+
+  const date = pickColumnDate(lastX, columns);
+  dragState.patch = applyMoveAcrossDays(ev, dy, HOUR_H, date);
+  const crossed = dragState.patch.start_date !== ev.start_date;
+  const left = crossed ? columnLeftFor(columns, dragState.patch.start_date) : null;
+  previewDrag(box, dragState.patch, left === null ? 0 : left - originLeft, crossed);
+}
+
+/**
+ * Pull the grid when a drag reaches its top or bottom edge.
+ *
+ * Without this, moving an event from the morning to the evening means dropping
+ * it, scrolling, and dragging again — the reachable range is one screenful.
+ *
+ * The loop runs for the rest of the gesture and does nothing on the frames the
+ * pointer is not near an edge, which keeps the decision in one place instead
+ * of starting and stopping a timer from the move handler. It redraws only when
+ * the scroller actually moved: at the end of the range scrollTop stops
+ * changing, and repainting an unchanged preview every frame is pure churn.
+ */
+function startAutoScroll() {
+  if (dragState.rafId) return;
+  const step = () => {
+    if (!dragState?.active) return;
+    dragState.rafId = requestAnimationFrame(step);
+    const { scrollEl, lastY } = dragState;
+    if (!scrollEl?.isConnected) return;
+    const rect = scrollEl.getBoundingClientRect();
+    const velocity = autoScrollVelocity(lastY, rect.top, rect.bottom);
+    if (!velocity) return;
+    const before = scrollEl.scrollTop;
+    scrollEl.scrollTop = before + velocity;
+    if (scrollEl.scrollTop === before) return;   // already at the end
+    updateDragPreview();
+  };
+  dragState.rafId = requestAnimationFrame(step);
 }
 
 /**
@@ -1083,10 +1238,16 @@ function onDragPointerMove(e) {
  * visibly snaps to the quarter hour as it moves and what the member sees while
  * dragging is exactly what gets written.
  */
-function previewDrag(box, patch) {
+function previewDrag(box, patch, dx = 0, crossed = false) {
   const { start, end } = eventSpanMins(patch);
   box.style.top    = `${(start / 60) * HOUR_H}px`;
   box.style.height = `${Math.max(((end - start) / 60) * HOUR_H - 2, 18)}px`;
+  // Slid sideways rather than re-parented into the target column. Moving the
+  // node would re-pack the overlap columns of both days on every frame, for a
+  // layout the drop re-renders correctly anyway — and it would detach the very
+  // box this gesture is holding a pointer capture on.
+  box.style.transform = dx ? `translateX(${dx}px)` : "";
+  if (dragState) dragState.previewDx = dx;
   let label = box.querySelector(".tg-ev-ghost-time");
   if (!label) {
     label = document.createElement("div");
@@ -1094,18 +1255,34 @@ function previewDrag(box, patch) {
     label.dataset.testid = "tg-drag-time";
     box.appendChild(label);
   }
-  label.textContent = `${fmtTime(patch.start_time)} – ${fmtTime(patch.end_time)}`;
+  const time = `${fmtTime(patch.start_time)} – ${fmtTime(patch.end_time)}`;
+  // The day only appears once the drag has left its own column: naming the
+  // current day on every ordinary vertical drag is noise.
+  label.textContent = crossed ? `${fmtDateShort(patch.start_date)} · ${time}` : time;
 }
 
 function onDragPointerUp(e) {
   if (!dragState || e.pointerId !== dragState.pointerId) return;
-  const { moved, patch, ev, box } = dragState;
+  const { moved, patch, ev, box, previewDx } = dragState;
   endDrag();
   // Same reason as the move handler: a drop onto a grid that no longer exists
   // is not a drop the member made against what they were looking at.
   if (!box.isConnected) return;
   if (!moved || !patch) return;
+  // The click still has to be swallowed either way: the gesture happened, and
+  // letting it through would open the detail modal on a drop.
   swallowNextClick();
+  // Dropped back where it started — within a snap of it, anyway. There is
+  // nothing to write, and writing it anyway would bump updated_at and could
+  // raise a conflict dialog over a move that never happened.
+  if (isNoopDragPatch(ev, patch)) { renderPreservingScroll(); return; }
+  // endDrag() has just reset the box to its own column. Normally invisible —
+  // the commit's optimistic render runs on the microtask that follows, before
+  // the browser paints. But the conflict dialog AWAITS, and across that await
+  // the member would be looking at an event showing its new time back on its
+  // old day. Put the offset back and let the render, which every branch of the
+  // commit reaches, be what clears it.
+  if (previewDx) box.style.transform = `translateX(${previewDx}px)`;
   commitDrag(ev, patch);
 }
 
@@ -1142,16 +1319,24 @@ function abandonDrag() {
 
 function endDrag() {
   if (!dragState) return;
-  const { box, armTimer, pointerId } = dragState;
+  const { box, armTimer, pointerId, rafId } = dragState;
   if (armTimer) clearTimeout(armTimer);
+  // The loop bails on a null dragState anyway, but leaving a frame queued for
+  // every drag of the session is a callback that outlives its reason to exist.
+  if (rafId) cancelAnimationFrame(rafId);
   try { box.releasePointerCapture(pointerId); } catch { /* already released */ }
   box.classList.remove("dragging", "armed");
+  // Inline styles previewDrag wrote. top/height are overwritten by the next
+  // render, but a transform left behind would offset the box against a column
+  // it is no longer being dragged out of.
+  box.style.transform = "";
   box.querySelector(".tg-ev-ghost-time")?.remove();
   dragState = null;
   window.removeEventListener("pointermove", onDragPointerMove);
   window.removeEventListener("pointerup", onDragPointerUp);
   window.removeEventListener("pointercancel", onDragPointerCancel);
   window.removeEventListener("touchmove", onDragTouchMove, { passive: false });
+  window.removeEventListener("resize", onViewportResize);
 }
 
 /**
@@ -1186,10 +1371,35 @@ async function runDragCommit(ev, patch, entry) {
   // that a failure outside the write itself left on screen.
   let restore = null;
   try {
+    // A resize patch carries no dates. Filling them in from the row keeps the
+    // three LOCAL things that must agree in agreement — what goes on screen,
+    // what a reload reapplies, and what the conflict check is run against.
+    // It deliberately does NOT decide what the UPDATE sends; see movesDay.
+    const full = {
+      ...patch,
+      start_date: patch.start_date ?? ev.start_date,
+      end_date: patch.end_date ?? ev.end_date ?? ev.start_date,
+    };
+    // The columns this gesture CHANGED, and no others. `full` is the whole
+    // resulting span and is right for the conflict check below, but it is the
+    // wrong thing to write or to re-apply: it carries the dates as they looked
+    // when the finger went down. A resize cannot move a day, so sending them
+    // would let it silently undo a day move someone else made while it was in
+    // flight — over the wire AND on screen, where withPendingDrags re-applies
+    // this patch to rows a reload has just brought back fresh.
+    const movesDay = dragChangesDate(ev, patch);
+    const changes = movesDay
+      ? {
+          start_time: full.start_time, end_time: full.end_time,
+          start_date: full.start_date, end_date: full.end_date,
+        }
+      : { start_time: full.start_time, end_time: full.end_time };
     // The same attendee-conflict check the edit form runs. Without it the
     // identical schedule change is stopped for confirmation through Edit and
-    // waved through by a drag.
-    const conflicts = findConflictsFor({ ...ev, ...patch }, new Set([ev.id]));
+    // waved through by a drag. findConflictsFor pools by `start_date`, so a
+    // cross-day drag is checked against the day it LANDS on, not the one it
+    // left — the reason `full` is built before this and not after.
+    const conflicts = findConflictsFor({ ...ev, ...full }, new Set([ev.id]));
     if (conflicts.length) {
       const ok = await hubConfirm("Schedule conflict", {
         description: describeConflicts(conflicts),
@@ -1207,20 +1417,30 @@ async function runDragCommit(ev, patch, entry) {
     // wholesale restore would also undo a different event's drag that
     // succeeded while this one was in flight.
     const prior = localEvents.find(e => e.id === ev.id);
+    // Derived from `changes` rather than listed again, so an undo can never
+    // cover more columns than the change it is undoing.
     restore = prior
-      ? { start_time: prior.start_time, end_time: prior.end_time, updated_at: prior.updated_at }
+      ? Object.fromEntries([...Object.keys(changes), "updated_at"].map(k => [k, prior[k]]))
       : null;
-    localEvents = localEvents.map(e => e.id === ev.id ? { ...e, ...patch, updated_at: now } : e);
-    entry.patch = patch;   // now on screen, so worth restoring after a reload
+    localEvents = localEvents.map(e => e.id === ev.id ? { ...e, ...changes, updated_at: now } : e);
+    entry.patch = changes;   // now on screen, so worth restoring after a reload
     renderPreservingScroll();
     try {
       // Guarded on the same conditions isDraggableEvent checked: a row a sync
       // re-sourced or a cancellation retired since the grid was drawn must not
       // be rewritten by a drag aimed at what it used to be.
-      const { changed } = await db(
-        `UPDATE app_calendar__events SET start_time=?,end_time=?,updated_at=? WHERE id=? AND source='local' AND is_cancelled=0`,
-        [patch.start_time, patch.end_time, now, ev.id],
-      );
+      // start_date and end_date are `_date`-suffixed, so the app-DB codec
+      // leaves them plaintext — they are safe to write as parameters and, if
+      // it ever came to it, to compare in a predicate.
+      const { changed } = movesDay
+        ? await db(
+            `UPDATE app_calendar__events SET start_time=?,end_time=?,start_date=?,end_date=?,updated_at=? WHERE id=? AND source='local' AND is_cancelled=0`,
+            [changes.start_time, changes.end_time, changes.start_date, changes.end_date, now, ev.id],
+          )
+        : await db(
+            `UPDATE app_calendar__events SET start_time=?,end_time=?,updated_at=? WHERE id=? AND source='local' AND is_cancelled=0`,
+            [changes.start_time, changes.end_time, now, ev.id],
+          );
       // A row policy refuses a write by NARROWING the UPDATE's predicate, not
       // by erroring: a refusal is HTTP 200 with changed: 0, which db() cannot
       // throw on. Without this the optimistic move stands, looks saved, and
