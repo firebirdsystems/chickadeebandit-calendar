@@ -134,6 +134,29 @@
       ]
     },
     {
+      "name": "holding a drag at the bottom edge auto-scrolls the grid to the end of the day",
+      "members": { "member": "adult" },
+      "steps": [
+        {
+          "action": "seedRaw",
+          "sql": "INSERT INTO app_calendar__events (id, title, start_date, start_time, end_date, end_time, all_day, visibility, source, created_by, created_at, updated_at) VALUES (?, ?, date('now'), '09:00', date('now'), '10:00', 0, 'everyone', 'local', ?, datetime('now'), datetime('now'))",
+          "params": ["ui-drag-autoscroll", "Late shift", "{{member}}"]
+        },
+
+        { "action": "open" },
+        { "action": "waitFor", "selector": "[data-testid=\"timegrid-event\"]" },
+
+        { "action": "drag", "selector": "[data-testid=\"timegrid-event\"]", "byY": 600, "holdMs": 2500 },
+
+        { "action": "reload" },
+        { "action": "waitFor", "selector": "[data-testid=\"timegrid-event\"]" },
+        { "action": "click", "selector": "[data-testid=\"timegrid-event\"]" },
+        { "action": "waitFor", "selector": "[data-testid=\"event-detail\"]" },
+        { "action": "expectText", "text": "10:45 PM \u2013 11:45 PM", "selector": "[data-testid=\"event-detail\"]" },
+        { "action": "expectNoText", "text": "7:45 PM", "selector": "[data-testid=\"event-detail\"]" }
+      ]
+    },
+    {
       "name": "a recurring occurrence offers no drag affordance and a plain event does",
       "members": { "member": "adult" },
       "steps": [
