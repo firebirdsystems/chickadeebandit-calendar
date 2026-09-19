@@ -17,8 +17,8 @@
       --accent:       var(--hub-primary, #111827);
       --accent-fg:    var(--hub-primary-fg, #ffffff);
       --accent-hover: var(--hub-primary-hover, #374151);
-      --accent-light: #f3f4f6;
-      --today-bg: #f0fdf4; --today-ring: #16a34a; --other-month: #9ca3af;
+      --accent-light: var(--bg);
+      --today-bg: var(--hub-tint-success, #f0fdf4); --today-ring: #16a34a; --today-ring-ink: var(--hub-tint-success-fg, #16a34a); --other-month: #9ca3af;
       --radius:       var(--hub-radius, 0.5rem);
       --shadow:       0 1px 3px rgba(0,0,0,.07);
     }
@@ -118,7 +118,7 @@
       font-size: 1.4rem; font-weight: 800; color: var(--text);
       text-transform: none; letter-spacing: 0; line-height: 1;
     }
-    .agenda-day-heading.today-heading .day-num { color: var(--today-ring); }
+    .agenda-day-heading.today-heading .day-num { color: var(--today-ring-ink); }
     .agenda-event {
       display: flex; align-items: flex-start; gap: 12px;
       padding: 10px 14px; background: var(--card);
@@ -163,7 +163,7 @@
       display: flex; align-items: center; justify-content: center;
       margin: 2px auto 0;
     }
-    .tg-day-hdr.tg-today .tg-hdr-dow { color: var(--today-ring); }
+    .tg-day-hdr.tg-today .tg-hdr-dow { color: var(--today-ring-ink); }
     .tg-day-hdr.tg-today .tg-hdr-num { background: var(--today-ring); color: white; }
 
     .tg-allday-bar {
@@ -203,7 +203,7 @@
       background: var(--card);
     }
     .tg-col:last-child { border-right: none; }
-    .tg-col.tg-today { background: #fafff8; }
+    .tg-col.tg-today { background: var(--bg); }
     .tg-col-lines {
       position: absolute; inset: 0; pointer-events: none;
     }
@@ -424,8 +424,8 @@
 
     /* ── Conflict warning (event form) ───────────────────── */
     .conflict-box {
-      background: #fffbeb; border: 1px solid #fcd34d; border-radius: 8px;
-      padding: 10px 12px; font-size: 0.8rem; color: #92400e; margin-top: 12px;
+      background: var(--hub-tint-warning, #fffbeb); border: 1px solid var(--hub-tint-warning-border, #fcd34d); border-radius: 8px;
+      padding: 10px 12px; font-size: 0.8rem; color: var(--hub-tint-warning-fg, #92400e); margin-top: 12px;
     }
     .conflict-box ul { margin: 4px 0 0 18px; }
     .search-row { margin-bottom: 12px; }
