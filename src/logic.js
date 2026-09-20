@@ -431,6 +431,127 @@ export function autoScrollVelocity(
 }
 
 /**
+ * Whether this row is one occurrence of a recurring series.
+ *
+ * Covers all three shapes the expansion produces, because a drop has to treat
+ * them alike: the series PRIMARY carrying the rule (which the grid only ever
+ * draws through a virtual occurrence), a `_virtual` occurrence generated from
+ * that rule, and a stored EXCEPTION row (`recurring_event_id`) standing in for
+ * one date. `_primaryId` is on both of the latter and is the marker the drag
+ * actually leans on; the other three are here so a row reaching this function
+ * from outside the expansion is still classified correctly.
+ */
+export function isSeriesOccurrence(ev) {
+  return Boolean(
+    ev && (ev.recurrence || ev.recurring_event_id || ev._virtual || ev._primaryId),
+  );
+}
+
+/**
+ * The row a recurring drop should be checked for conflicts against.
+ *
+ * Not the occurrence under the finger — the row the chosen scope will actually
+ * WRITE, which is not the same thing for a split.
+ *
+ * "This and following" creates a new series from the PRIMARY's columns, so it
+ * carries the primary's attendees. An override, meanwhile, may have attendees
+ * of its own: the edit form's "this" scope writes whatever the form says, so
+ * one occurrence can involve entirely different people from the series it
+ * belongs to. Checking the override's attendees for a split would then warn
+ * about people the new series does not involve, and say nothing about the ones
+ * it does — a double-booking waved through by the one scope most likely to
+ * create several of them.
+ *
+ * Every other scope writes the occurrence itself ("this") or the series at the
+ * occurrence's own time ("all", which is checked on the dropped date only), so
+ * the occurrence is the right candidate for both.
+ *
+ * `occDate` is pinned LAST, after the patch, because a split happens at the
+ * date the RULE generated — an override dragged to another day still splits
+ * the series where its own occurrence was.
+ */
+export function seriesConflictCandidate({ scope, wholeSeries, ev, primary, patch, occDate }) {
+  if (scope === "following" && !wholeSeries) {
+    return { ...primary, ...patch, start_date: occDate, end_date: occDate };
+  }
+  return { ...ev, ...patch };
+}
+
+/**
+ * Whether this occurrence is backed by a STORED row of its own, rather than
+ * generated from the rule.
+ *
+ * Read off `recurring_event_id`, the column that MAKES a row an exception —
+ * the expansion spreads the stored row into the occurrence it emits, so the
+ * column survives into the expanded object, while a virtual occurrence is
+ * spread from the primary and carries it null.
+ *
+ * A stored exception's own times outrank the series', which is what makes this
+ * a write decision and not a cosmetic one: a series-wide change that skipped
+ * the exception would leave that date where it was.
+ */
+export function isSeriesException(ev) {
+  return Boolean(ev?.recurring_event_id);
+}
+
+/**
+ * Whether a drag of this event may land it on a different DAY.
+ *
+ * Yes for a standalone event; no for a recurring occurrence, and the asymmetry
+ * is not a simplification — it is that "which day" has no single answer across
+ * the three scopes a recurring drop offers. Under "this event" a new date is
+ * well defined: the exception row carries its own start_date while
+ * `original_date` keeps it pinned to the occurrence it replaces. Under "all
+ * events" it is not a move at all but a RULE change — a weekly series dragged
+ * from Monday to Wednesday has to be rewritten, `days` and anchor together —
+ * and under "this and following" it is that same rewrite applied to the tail.
+ *
+ * Offering a day change that two of the three scopes cannot honour would make
+ * the preview a promise the scope picker then breaks, so the day is held for
+ * the whole gesture and the picker only ever decides WHICH occurrences take
+ * the new time.
+ */
+export function dragMayChangeDay(ev) {
+  return !isSeriesOccurrence(ev);
+}
+
+/**
+ * The two rules a "this and following" split leaves behind.
+ *
+ * `head` keeps the original series and stops the day before `occDate`; `tail`
+ * is the rule the new series carries from `occDate` onwards.
+ *
+ * `count` is the reason this is a function rather than one spread. A rule
+ * counted in occurrences, split in two, must not hand BOTH halves the original
+ * total — that is how a 10-week series becomes a 13-week one. The tail keeps
+ * only what the head did not use, and the head drops its count entirely: with
+ * `end_date` now set, the head's extent is fully determined by the date, and
+ * leaving a second, differently-shaped bound on the same rule is an invitation
+ * for the two to disagree later.
+ *
+ * `precedingCount` is how many occurrences fall strictly before `occDate`, which
+ * only the expansion can answer — so the caller counts and this function
+ * arithmetic.
+ *
+ * `end_type` is set on the head as well, and it is not decoration. The
+ * expansion reads `end_date` and so the cap works immediately; the EDIT FORM
+ * reads `end_type` to choose its control, and rebuilds the rule from whatever
+ * that control then says. A head capped by date but still labelled "never"
+ * therefore loses its cap the first time anyone opens it and presses Save —
+ * and the series it was split away from starts generating over the top of the
+ * tail again, which is the overlapping-series state the split exists to avoid.
+ */
+export function splitRecurrence(rule, occDate, precedingCount = 0) {
+  const head = { ...(rule ?? {}), end_date: addDayStr(occDate, -1), end_type: "date" };
+  delete head.count;
+  const tail = { ...(rule ?? {}) };
+  if (typeof rule?.count === "number") {
+    tail.count = Math.max(1, rule.count - precedingCount);
+  }
+  return { head, tail };
+}
+
+/**
  * Whether the time grid offers drag/resize for this event.
  *
  * Only the simple case is draggable. Each exclusion is a write this code could
@@ -441,11 +562,14 @@ export function autoScrollVelocity(
  *  - `source !== 'local'`: synced and cross-app rows are read-only projections
  *    of someone else's calendar; the app only offers to hide them.
  *  - all-day / no start_time: not in the timed grid at all.
- *  - recurring (a rule, or an exception row): moving one occurrence is a
- *    this/following/all decision, not a drag.
  *  - multi-day: applyMoveAcrossDays shifts start_date and end_date together,
  *    which is only the right answer while they are the same day.
  *  - cancelled: the guarded UPDATE excludes it anyway.
+ *
+ * A recurring occurrence IS draggable, and is the one case whose drop is not a
+ * single UPDATE: which occurrences move is a this/following/all question, so
+ * the drop asks it. What such a drag may change is narrower than a simple
+ * event's — see dragMayChangeDay.
  */
 export function isDraggableEvent(ev, { canWrite } = {}) {
   if (!canWrite || !ev) return false;
@@ -455,7 +579,6 @@ export function isDraggableEvent(ev, { canWrite } = {}) {
   // reaching past the last representable slot. Both are reachable rows (the
   // form validates neither), and both are fixed in the form, not by dragging.
   if (!isDraggableSpan(eventSpanMins(ev))) return false;
-  if (ev.recurrence || ev.recurring_event_id || ev._virtual || ev._primaryId) return false;
   if (ev.start_date !== ev.end_date) return false;
   return !ev.is_cancelled;
 }
@@ -570,4 +693,168 @@ export function createPendingDrags() {
   };
 
   return api;
+}
+
+// ─── Event write statements ───────────────────────────────────────────────
+// Every write to app_calendar__events is built here rather than spelled out at
+// the call site. The reason is a defect that recurred through five review
+// rounds and was never once novel: a guard present on one write path and
+// missing from the copy beside it — requireChanges on one cap but not the
+// other, `updated_at` on the drag but not the form, `visibility` carried by
+// three derived INSERTs and dropped by the fourth. Seventeen hand-written
+// statements for six logical operations is what made that possible, and the
+// fix is not to review the copies harder but to stop having copies: a guard
+// written once cannot be missing from a caller that does not spell it.
+//
+// These are pure — no DOM, no `crypto`, no session — so the guards are
+// assertable in unit tests instead of only through the browser lane, which is
+// what previously made each one cost a ~30s scenario to prove.
+
+/** The columns a derived row copies, in statement order. */
+const CONTENT_COLUMNS = [
+  "title", "description", "location", "start_date", "start_time",
+  "end_date", "end_time", "all_day", "color", "organizer_id", "attendee_ids",
+];
+
+/**
+ * A guarded UPDATE of one event row.
+ *
+ * The predicate is the point, and it is not optional: `id` alone says "this
+ * row", which is not the claim any of these writes actually needs to make.
+ * They need "this row, as I last saw it" —
+ *
+ *  - `source='local'`   a synced row is not ours to rewrite
+ *  - `is_cancelled=0`   a cancelled row is not on screen to have been acted on
+ *  - `updated_at=?`     the version the patch was COMPUTED FROM
+ *
+ * That last one carries the weight. Most of these writes are arithmetic on a
+ * value they read earlier (a drag adds an hour to the start_time it saw at
+ * pointerdown; a form replays the times it was opened with), so a row someone
+ * else has moved since makes the result arithmetic on a number that is no
+ * longer there. Without the predicate the write lands anyway and silently
+ * discards the other change.
+ *
+ * `version` is the caller's snapshot, never a value re-read at write time —
+ * re-reading returns whatever overwrote it and passes its own guard.
+ *
+ * A refusal is not an error: the hub answers a predicate that matches nothing
+ * with HTTP 200 and `changed: 0`. Single-statement callers must test that;
+ * inside a batch, guardedBatch makes it roll the transaction back instead.
+ */
+export function updateEvent({ id, version, now, set = {} }) {
+  const columns = Object.keys(set);
+  const assignments = [...columns.map(c => `${c}=?`), "updated_at=?"].join(",");
+  return {
+    sql: `UPDATE app_calendar__events SET ${assignments} WHERE id=? AND source='local' AND is_cancelled=0 AND updated_at=?`,
+    params: [...columns.map(c => set[c]), now, id, version],
+  };
+}
+
+/**
+ * Touch the series to claim it, changing nothing else.
+ *
+ * An INSERT has nothing to guard on — there is no row yet to narrow a
+ * predicate against — so a batch that creates a row derived from a series
+ * claims the series first, and that one statement does two jobs.
+ *
+ * It asserts the parent is still there. An override is only ever drawn
+ * THROUGH its parent, so one whose series was deleted between the read and
+ * the write is invisible in every view and impossible to remove.
+ *
+ * And it SERIALIZES creation. `(recurring_event_id, original_date)` carries
+ * only a non-unique index, so nothing in the schema stops two members creating
+ * an override for the same occurrence at once — and because the expansion keys
+ * by that date, the loser is not a visible duplicate but a row that silently
+ * vanishes. Matching `updated_at` and then bumping it makes the series the row
+ * they contend on: the first batch moves the version, the second no longer
+ * matches and rolls back.
+ *
+ * The bump is not a side effect to apologize for. The series did just change:
+ * it acquired an override.
+ */
+export function claimSeries(primary, now, version = primary.updated_at) {
+  return updateEvent({ id: primary.id, version, now });
+}
+
+/**
+ * An exception row standing in for one date of a series.
+ *
+ * `primary` is taken whole, not as an id, because two of these columns are
+ * invariants rather than inputs and a caller must not be able to supply them:
+ * `recurring_event_id` is what makes the row an override at all, and
+ * `visibility` is inherited because the column DEFAULTS to 'everyone' and the
+ * row policy reads it — so an override of a private series that omits it
+ * publishes that date to the whole household. That omission has been written
+ * four separate times in this file's history, which is why it is no longer
+ * possible to write here.
+ */
+export function insertOverride({ id, primary, occDate, actor, now, values, cancelled = false }) {
+  const columns = [...CONTENT_COLUMNS, "recurring_event_id", "original_date",
+    ...(cancelled ? ["is_cancelled"] : []), "visibility"];
+  return {
+    sql: `INSERT INTO app_calendar__events (id,${columns.join(",")},source,created_by,created_at,updated_at)
+          VALUES (${["?", ...columns.map(() => "?")].join(",")},'local',?,?,?)`,
+    params: [id, ...CONTENT_COLUMNS.map(c => values[c]), primary.id, occDate,
+      ...(cancelled ? [1] : []), primary.visibility, actor, now, now],
+  };
+}
+
+/**
+ * A new series split off an existing one, carrying its own rule.
+ *
+ * Inherits `visibility` from the series it was split from for the same reason
+ * an override does: the tail of a private series must not become public
+ * because someone dragged it.
+ */
+export function insertSeries({ id, primary, actor, now, values }) {
+  const columns = [...CONTENT_COLUMNS, "recurrence", "visibility"];
+  return {
+    sql: `INSERT INTO app_calendar__events (id,${columns.join(",")},source,created_by,created_at,updated_at)
+          VALUES (${["?", ...columns.map(() => "?")].join(",")},'local',?,?,?)`,
+    params: [id, ...CONTENT_COLUMNS.map(c => values[c]), values.recurrence,
+      primary.visibility, actor, now, now],
+  };
+}
+
+/**
+ * The row an edit form should be built from.
+ *
+ * "This event" on a date that already has an override must open THAT row: its
+ * title, times and attendees are what the member last set for that date, and
+ * the save path writes to it. A form built from the series instead shows
+ * values that were never on screen for this occurrence and then saves them
+ * over the member's own — which is what happened while this decision was a
+ * `recurring_event_id` test against a row that is always the primary.
+ *
+ * The lesson is why this is a function and not an expression: the caller
+ * supplies the override it FOUND, so there is no row-shape test left to get
+ * wrong, and the choice is assertable without a browser.
+ *
+ * With no override, a scoped edit still opens on the occurrence's own date
+ * rather than the series' start, so the form describes the date the member
+ * clicked.
+ */
+export function editTargetFor({ primary, override, scope, occDate }) {
+  if (scope === "this" && override) return override;
+  if (scope === "all") return primary;
+  return { ...primary, start_date: occDate, end_date: occDate };
+}
+
+/**
+ * Whether a drop's snapshot still describes the rows it is about to write.
+ *
+ * A drop carries an ABSOLUTE patch — times computed from the row as it was at
+ * pointerdown — and the scope picker then sits open for as long as the member
+ * takes to decide. Re-reading the rows before writing is necessary (a split
+ * writes the series' rule back verbatim, so a stale copy would restore a rule
+ * someone has just removed) but it must not be mistaken for making the drop
+ * valid again: the patch cannot be recomputed once the finger is up.
+ *
+ * So a refreshed version is a reason to STOP, never a fresher credential to
+ * write with. Pairing the old patch with the new version is what lets a drag
+ * overwrite an edit it never saw.
+ */
+export function dropIsStale(drop, primary, ev) {
+  return primary?.updated_at !== drop?.primary?.updated_at
+      || ev?.updated_at !== drop?.ev?.updated_at;
 }

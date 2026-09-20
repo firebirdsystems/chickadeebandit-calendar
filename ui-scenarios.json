@@ -157,7 +157,7 @@
       ]
     },
     {
-      "name": "a recurring occurrence offers no drag affordance and a plain event does",
+      "name": "every timed local event offers a drag affordance except one the drag math cannot move",
       "members": { "member": "adult" },
       "steps": [
         {
@@ -170,13 +170,674 @@
           "sql": "INSERT INTO app_calendar__events (id, title, start_date, start_time, end_date, end_time, all_day, recurrence, visibility, source, created_by, created_at, updated_at) VALUES (?, ?, date('now'), '14:00', date('now'), '15:00', 0, ?, 'everyone', 'local', ?, datetime('now'), datetime('now'))",
           "params": ["ui-drag-series", "Yoga", "{\"freq\":\"weekly\",\"interval\":1}", "{{member}}"]
         },
+        {
+          "action": "seedRaw",
+          "sql": "INSERT INTO app_calendar__events (id, title, start_date, start_time, end_date, end_time, all_day, visibility, source, created_by, created_at, updated_at) VALUES (?, ?, date('now'), '22:00', date('now'), '23:50', 0, 'everyone', 'local', ?, datetime('now'), datetime('now'))",
+          "params": ["ui-drag-unmovable", "Night shift", "{{member}}"]
+        },
 
         { "action": "open" },
         { "action": "waitFor", "selector": "[data-testid=\"time-grid\"]" },
 
-        { "action": "expectCount", "selector": "[data-testid=\"timegrid-event\"]", "count": 2 },
-        { "action": "expectCount", "selector": "[data-testid=\"timegrid-event\"][data-drag-id]", "count": 1 },
-        { "action": "expectCount", "selector": "[data-testid=\"timegrid-event\"]:not([data-drag-id])", "count": 1 }
+        { "action": "expectCount", "selector": "[data-testid=\"timegrid-event\"]", "count": 3 },
+        { "action": "expectCount", "selector": "[data-testid=\"timegrid-event\"][data-drag-key]", "count": 2 },
+        { "action": "expectCount", "selector": "[data-testid=\"timegrid-event\"]:not([data-drag-key])", "count": 1 }
+      ]
+    },
+    {
+      "name": "dropping one occurrence of a series and choosing This event moves only that date",
+      "members": { "member": "adult" },
+      "steps": [
+        {
+          "action": "seedRaw",
+          "sql": "INSERT INTO app_calendar__events (id, title, start_date, start_time, end_date, end_time, all_day, recurrence, visibility, source, created_by, created_at, updated_at) VALUES (?, ?, date('now','weekday 0','-6 days'), '09:00', date('now','weekday 0','-6 days'), '10:00', 0, ?, 'everyone', 'local', ?, datetime('now'), datetime('now'))",
+          "params": ["ui-drag-series-this", "Morning walk", "{\"freq\":\"daily\"}", "{{member}}"]
+        },
+
+        { "action": "open" },
+        { "action": "waitFor", "selector": "[data-testid=\"timegrid-column\"]:nth-child(1) [data-testid=\"timegrid-event\"]" },
+        { "action": "expectCount", "selector": "[data-testid=\"timegrid-event\"]", "count": 7 },
+
+        { "action": "drag", "selector": "[data-testid=\"timegrid-column\"]:nth-child(1) [data-testid=\"timegrid-event\"]", "byY": 112 },
+        { "action": "waitFor", "selector": "[data-testid=\"event-scope-modal\"]" },
+        { "action": "click", "selector": "[data-testid=\"scope-option\"][data-scope=\"this\"]" },
+
+        { "action": "reload" },
+        { "action": "waitFor", "selector": "[data-testid=\"timegrid-column\"]:nth-child(1) [data-testid=\"timegrid-event\"]" },
+        { "action": "expectCount", "selector": "[data-testid=\"timegrid-event\"]", "count": 7 },
+
+        { "action": "click", "selector": "[data-testid=\"timegrid-column\"]:nth-child(1) [data-testid=\"timegrid-event\"]" },
+        { "action": "waitFor", "selector": "[data-testid=\"event-detail\"]" },
+        { "action": "expectText", "text": "11 AM \u2013 12 PM", "selector": "[data-testid=\"event-detail\"]" },
+        { "action": "expectNoText", "text": "9 AM \u2013 10 AM", "selector": "[data-testid=\"event-detail\"]" },
+        { "action": "click", "selector": "[data-testid=\"event-detail-dismiss\"]" },
+        { "action": "click", "selector": "[data-testid=\"timegrid-column\"]:nth-child(2) [data-testid=\"timegrid-event\"]" },
+        { "action": "waitFor", "selector": "[data-testid=\"event-detail\"]" },
+        { "action": "expectText", "text": "9 AM \u2013 10 AM", "selector": "[data-testid=\"event-detail\"]" },
+        { "action": "click", "selector": "[data-testid=\"event-detail-dismiss\"]" }
+      ]
+    },
+    {
+      "name": "dropping one occurrence of a series and choosing All events moves the whole series",
+      "members": { "member": "adult" },
+      "steps": [
+        {
+          "action": "seedRaw",
+          "sql": "INSERT INTO app_calendar__events (id, title, start_date, start_time, end_date, end_time, all_day, recurrence, visibility, source, created_by, created_at, updated_at) VALUES (?, ?, date('now','weekday 0','-6 days'), '09:00', date('now','weekday 0','-6 days'), '10:00', 0, ?, 'everyone', 'local', ?, datetime('now'), datetime('now'))",
+          "params": ["ui-drag-series-all", "Evening reading", "{\"freq\":\"daily\"}", "{{member}}"]
+        },
+
+        { "action": "open" },
+        { "action": "waitFor", "selector": "[data-testid=\"timegrid-column\"]:nth-child(1) [data-testid=\"timegrid-event\"]" },
+        { "action": "expectCount", "selector": "[data-testid=\"timegrid-event\"]", "count": 7 },
+
+        { "action": "drag", "selector": "[data-testid=\"timegrid-column\"]:nth-child(3) [data-testid=\"timegrid-event\"]", "byY": 112 },
+        { "action": "waitFor", "selector": "[data-testid=\"event-scope-modal\"]" },
+        { "action": "click", "selector": "[data-testid=\"scope-option\"][data-scope=\"all\"]" },
+
+        { "action": "reload" },
+        { "action": "waitFor", "selector": "[data-testid=\"timegrid-column\"]:nth-child(1) [data-testid=\"timegrid-event\"]" },
+        { "action": "expectCount", "selector": "[data-testid=\"timegrid-event\"]", "count": 7 },
+
+        { "action": "click", "selector": "[data-testid=\"timegrid-column\"]:nth-child(1) [data-testid=\"timegrid-event\"]" },
+        { "action": "waitFor", "selector": "[data-testid=\"event-detail\"]" },
+        { "action": "expectText", "text": "11 AM \u2013 12 PM", "selector": "[data-testid=\"event-detail\"]" },
+        { "action": "click", "selector": "[data-testid=\"event-detail-dismiss\"]" },
+        { "action": "click", "selector": "[data-testid=\"timegrid-column\"]:nth-child(7) [data-testid=\"timegrid-event\"]" },
+        { "action": "waitFor", "selector": "[data-testid=\"event-detail\"]" },
+        { "action": "expectText", "text": "11 AM \u2013 12 PM", "selector": "[data-testid=\"event-detail\"]" },
+        { "action": "click", "selector": "[data-testid=\"event-detail-dismiss\"]" }
+      ]
+    },
+    {
+      "name": "dropping one occurrence of a series and choosing This and following splits it at that date",
+      "members": { "member": "adult" },
+      "steps": [
+        {
+          "action": "seedRaw",
+          "sql": "INSERT INTO app_calendar__events (id, title, start_date, start_time, end_date, end_time, all_day, recurrence, visibility, source, created_by, created_at, updated_at) VALUES (?, ?, date('now','weekday 0','-6 days'), '09:00', date('now','weekday 0','-6 days'), '10:00', 0, ?, 'everyone', 'local', ?, datetime('now'), datetime('now'))",
+          "params": ["ui-drag-series-following", "Team huddle", "{\"freq\":\"daily\"}", "{{member}}"]
+        },
+
+        { "action": "open" },
+        { "action": "waitFor", "selector": "[data-testid=\"timegrid-column\"]:nth-child(1) [data-testid=\"timegrid-event\"]" },
+        { "action": "expectCount", "selector": "[data-testid=\"timegrid-event\"]", "count": 7 },
+
+        { "action": "drag", "selector": "[data-testid=\"timegrid-column\"]:nth-child(4) [data-testid=\"timegrid-event\"]", "byY": 112 },
+        { "action": "waitFor", "selector": "[data-testid=\"event-scope-modal\"]" },
+        { "action": "click", "selector": "[data-testid=\"scope-option\"][data-scope=\"following\"]" },
+
+        { "action": "reload" },
+        { "action": "waitFor", "selector": "[data-testid=\"timegrid-column\"]:nth-child(1) [data-testid=\"timegrid-event\"]" },
+        { "action": "expectCount", "selector": "[data-testid=\"timegrid-event\"]", "count": 7 },
+
+        { "action": "click", "selector": "[data-testid=\"timegrid-column\"]:nth-child(3) [data-testid=\"timegrid-event\"]" },
+        { "action": "waitFor", "selector": "[data-testid=\"event-detail\"]" },
+        { "action": "expectText", "text": "9 AM \u2013 10 AM", "selector": "[data-testid=\"event-detail\"]" },
+        { "action": "click", "selector": "[data-testid=\"event-detail-dismiss\"]" },
+        { "action": "click", "selector": "[data-testid=\"timegrid-column\"]:nth-child(4) [data-testid=\"timegrid-event\"]" },
+        { "action": "waitFor", "selector": "[data-testid=\"event-detail\"]" },
+        { "action": "expectText", "text": "11 AM \u2013 12 PM", "selector": "[data-testid=\"event-detail\"]" },
+        { "action": "expectNoText", "text": "9 AM \u2013 10 AM", "selector": "[data-testid=\"event-detail\"]" },
+        { "action": "click", "selector": "[data-testid=\"event-detail-dismiss\"]" },
+        { "action": "click", "selector": "[data-testid=\"timegrid-column\"]:nth-child(7) [data-testid=\"timegrid-event\"]" },
+        { "action": "waitFor", "selector": "[data-testid=\"event-detail\"]" },
+        { "action": "expectText", "text": "11 AM \u2013 12 PM", "selector": "[data-testid=\"event-detail\"]" },
+        { "action": "click", "selector": "[data-testid=\"event-detail-dismiss\"]" }
+      ]
+    },
+    {
+      "name": "choosing All events also moves an occurrence that already has its own override",
+      "members": { "member": "adult" },
+      "steps": [
+        {
+          "action": "seedRaw",
+          "sql": "INSERT INTO app_calendar__events (id, title, start_date, start_time, end_date, end_time, all_day, recurrence, visibility, source, created_by, created_at, updated_at) VALUES (?, ?, date('now','weekday 0','-6 days'), '09:00', date('now','weekday 0','-6 days'), '10:00', 0, ?, 'everyone', 'local', ?, datetime('now'), datetime('now'))",
+          "params": ["ui-drag-series-override", "Stretching", "{\"freq\":\"daily\"}", "{{member}}"]
+        },
+
+        { "action": "open" },
+        { "action": "waitFor", "selector": "[data-testid=\"timegrid-column\"]:nth-child(1) [data-testid=\"timegrid-event\"]" },
+        { "action": "expectCount", "selector": "[data-testid=\"timegrid-event\"]", "count": 7 },
+
+        { "action": "drag", "selector": "[data-testid=\"timegrid-column\"]:nth-child(1) [data-testid=\"timegrid-event\"]", "byY": 112 },
+        { "action": "waitFor", "selector": "[data-testid=\"event-scope-modal\"]" },
+        { "action": "click", "selector": "[data-testid=\"scope-option\"][data-scope=\"this\"]" },
+
+        { "action": "reload" },
+        { "action": "waitFor", "selector": "[data-testid=\"timegrid-column\"]:nth-child(1) [data-testid=\"timegrid-event\"]" },
+        { "action": "expectCount", "selector": "[data-testid=\"timegrid-event\"]", "count": 7 },
+
+        { "action": "click", "selector": "[data-testid=\"timegrid-column\"]:nth-child(1) [data-testid=\"timegrid-event\"]" },
+        { "action": "waitFor", "selector": "[data-testid=\"event-detail\"]" },
+        { "action": "expectText", "text": "11 AM \u2013 12 PM", "selector": "[data-testid=\"event-detail\"]" },
+        { "action": "click", "selector": "[data-testid=\"event-detail-dismiss\"]" },
+
+        { "action": "drag", "selector": "[data-testid=\"timegrid-column\"]:nth-child(1) [data-testid=\"timegrid-event\"]", "byY": 112 },
+        { "action": "waitFor", "selector": "[data-testid=\"event-scope-modal\"]" },
+        { "action": "click", "selector": "[data-testid=\"scope-option\"][data-scope=\"all\"]" },
+
+        { "action": "reload" },
+        { "action": "waitFor", "selector": "[data-testid=\"timegrid-column\"]:nth-child(1) [data-testid=\"timegrid-event\"]" },
+        { "action": "expectCount", "selector": "[data-testid=\"timegrid-event\"]", "count": 7 },
+
+        { "action": "click", "selector": "[data-testid=\"timegrid-column\"]:nth-child(1) [data-testid=\"timegrid-event\"]" },
+        { "action": "waitFor", "selector": "[data-testid=\"event-detail\"]" },
+        { "action": "expectText", "text": "1 PM \u2013 2 PM", "selector": "[data-testid=\"event-detail\"]" },
+        { "action": "expectNoText", "text": "11 AM \u2013 12 PM", "selector": "[data-testid=\"event-detail\"]" },
+        { "action": "click", "selector": "[data-testid=\"event-detail-dismiss\"]" },
+        { "action": "click", "selector": "[data-testid=\"timegrid-column\"]:nth-child(2) [data-testid=\"timegrid-event\"]" },
+        { "action": "waitFor", "selector": "[data-testid=\"event-detail\"]" },
+        { "action": "expectText", "text": "1 PM \u2013 2 PM", "selector": "[data-testid=\"event-detail\"]" },
+        { "action": "click", "selector": "[data-testid=\"event-detail-dismiss\"]" }
+      ]
+    },
+    {
+      "name": "dragging a series occurrence sideways moves nothing and asks nothing",
+      "members": { "member": "adult" },
+      "steps": [
+        {
+          "action": "seedRaw",
+          "sql": "INSERT INTO app_calendar__events (id, title, start_date, start_time, end_date, end_time, all_day, recurrence, visibility, source, created_by, created_at, updated_at) VALUES (?, ?, date('now','weekday 0','-6 days'), '09:00', date('now','weekday 0','-6 days'), '10:00', 0, ?, 'everyone', 'local', ?, datetime('now'), datetime('now'))",
+          "params": ["ui-drag-series-sideways", "Meditation", "{\"freq\":\"daily\"}", "{{member}}"]
+        },
+
+        { "action": "open" },
+        { "action": "waitFor", "selector": "[data-testid=\"timegrid-column\"]:nth-child(1) [data-testid=\"timegrid-event\"]" },
+        { "action": "expectCount", "selector": "[data-testid=\"timegrid-event\"]", "count": 7 },
+
+        { "action": "drag", "selector": "[data-testid=\"timegrid-column\"]:nth-child(1) [data-testid=\"timegrid-event\"]", "byX": 4000 },
+
+        { "action": "expectCount", "selector": "[data-testid=\"event-scope-modal\"]", "count": 0 },
+        { "action": "expectCount", "selector": "[data-testid=\"write-error\"]", "count": 0 },
+
+        { "action": "reload" },
+        { "action": "waitFor", "selector": "[data-testid=\"timegrid-column\"]:nth-child(1) [data-testid=\"timegrid-event\"]" },
+        { "action": "expectCount", "selector": "[data-testid=\"timegrid-event\"]", "count": 7 },
+        { "action": "click", "selector": "[data-testid=\"timegrid-column\"]:nth-child(1) [data-testid=\"timegrid-event\"]" },
+        { "action": "waitFor", "selector": "[data-testid=\"event-detail\"]" },
+        { "action": "expectText", "text": "9 AM \u2013 10 AM", "selector": "[data-testid=\"event-detail\"]" }
+      ]
+    },
+    {
+      "name": "the new series a drag splits off inherits the old one's visibility instead of the column default",
+      "members": { "owner": "adult", "other": "adult" },
+      "steps": [
+        {
+          "action": "seedRaw",
+          "sql": "INSERT INTO app_calendar__events (id, title, start_date, start_time, end_date, end_time, all_day, recurrence, visibility, source, created_by, created_at, updated_at) VALUES (?, ?, date('now','weekday 0','-6 days'), '09:00', date('now','weekday 0','-6 days'), '10:00', 0, ?, 'private', 'local', ?, datetime('now'), datetime('now'))",
+          "params": ["ui-drag-series-private", "Counselling", "{\"freq\":\"daily\"}", "{{owner}}"]
+        },
+
+        { "action": "open", "as": "owner" },
+        { "action": "waitFor", "as": "owner", "selector": "[data-testid=\"timegrid-column\"]:nth-child(1) [data-testid=\"timegrid-event\"]" },
+        { "action": "expectCount", "as": "owner", "selector": "[data-testid=\"timegrid-event\"]", "count": 7 },
+
+        { "action": "drag", "as": "owner", "selector": "[data-testid=\"timegrid-column\"]:nth-child(4) [data-testid=\"timegrid-event\"]", "byY": 112 },
+        { "action": "waitFor", "as": "owner", "selector": "[data-testid=\"event-scope-modal\"]" },
+        { "action": "click", "as": "owner", "selector": "[data-testid=\"scope-option\"][data-scope=\"following\"]" },
+
+        { "action": "reload", "as": "owner" },
+        { "action": "waitFor", "as": "owner", "selector": "[data-testid=\"timegrid-column\"]:nth-child(1) [data-testid=\"timegrid-event\"]" },
+        { "action": "expectCount", "as": "owner", "selector": "[data-testid=\"timegrid-event\"]", "count": 7 },
+        { "action": "click", "as": "owner", "selector": "[data-testid=\"timegrid-column\"]:nth-child(4) [data-testid=\"timegrid-event\"]" },
+        { "action": "waitFor", "as": "owner", "selector": "[data-testid=\"event-detail\"]" },
+        { "action": "expectText", "as": "owner", "text": "11 AM \u2013 12 PM", "selector": "[data-testid=\"event-detail\"]" },
+
+        { "action": "open", "as": "other" },
+        { "action": "waitFor", "as": "other", "selector": "[data-testid=\"time-grid\"]" },
+        { "action": "expectCount", "as": "other", "selector": "[data-testid=\"timegrid-event\"]", "count": 0 },
+        { "action": "expectNoText", "as": "other", "text": "Counselling" }
+      ]
+    },
+    {
+      "name": "a series deleted while the scope picker is open refuses the split instead of leaving a new one behind",
+      "members": { "member": "adult" },
+      "expectsRefusedWrite": true,
+      "steps": [
+        {
+          "action": "seedRaw",
+          "sql": "INSERT INTO app_calendar__events (id, title, start_date, start_time, end_date, end_time, all_day, recurrence, visibility, source, created_by, created_at, updated_at) VALUES (?, ?, date('now','weekday 0','-6 days'), '09:00', date('now','weekday 0','-6 days'), '10:00', 0, ?, 'everyone', 'local', ?, datetime('now'), datetime('now'))",
+          "params": ["ui-drag-race-following", "Book club", "{\"freq\":\"daily\"}", "{{member}}"]
+        },
+
+        { "action": "open" },
+        { "action": "waitFor", "selector": "[data-testid=\"timegrid-column\"]:nth-child(1) [data-testid=\"timegrid-event\"]" },
+        { "action": "expectCount", "selector": "[data-testid=\"timegrid-event\"]", "count": 7 },
+
+        { "action": "drag", "selector": "[data-testid=\"timegrid-column\"]:nth-child(4) [data-testid=\"timegrid-event\"]", "byY": 112 },
+        { "action": "waitFor", "selector": "[data-testid=\"event-scope-modal\"]" },
+
+        {
+          "action": "seedRaw",
+          "sql": "DELETE FROM app_calendar__events WHERE id = ?",
+          "params": ["ui-drag-race-following"]
+        },
+
+        { "action": "click", "selector": "[data-testid=\"scope-option\"][data-scope=\"following\"]" },
+        { "action": "waitFor", "selector": "[data-testid=\"write-error\"]" },
+
+        { "action": "reload" },
+        { "action": "waitFor", "selector": "[data-testid=\"time-grid\"]" },
+        { "action": "expectCount", "selector": "[data-testid=\"timegrid-event\"]", "count": 0 }
+      ]
+    },
+    {
+      "name": "a series deleted while the scope picker is open refuses moving an occurrence that already has its own override",
+      "members": {"member": "adult"},
+      "expectsRefusedWrite": true,
+      "steps": [
+        {
+          "action": "seedRaw",
+          "sql": "INSERT INTO app_calendar__events (id, title, start_date, start_time, end_date, end_time, all_day, recurrence, visibility, source, created_by, created_at, updated_at) VALUES (?, ?, date('now','weekday 0','-6 days'), '09:00', date('now','weekday 0','-6 days'), '10:00', 0, ?, 'everyone', 'local', ?, datetime('now'), datetime('now'))",
+          "params": ["ui-drag-ex-race", "Book club", "{\"freq\":\"daily\"}", "{{member}}"]
+        },
+        {
+          "action": "seedRaw",
+          "sql": "INSERT INTO app_calendar__events (id, title, start_date, start_time, end_date, end_time, all_day, recurring_event_id, original_date, visibility, source, created_by, created_at, updated_at) VALUES (?, ?, date('now','weekday 0','-3 days'), '11:00', date('now','weekday 0','-3 days'), '12:00', 0, ?, date('now','weekday 0','-3 days'), 'everyone', 'local', ?, datetime('now'), datetime('now'))",
+          "params": ["ui-drag-ex-race-ex", "Book club moved", "ui-drag-ex-race", "{{member}}"]
+        },
+        {"action": "open"},
+        {"action": "waitFor", "selector": "[data-testid=\"timegrid-column\"]:nth-child(1) [data-testid=\"timegrid-event\"]"},
+        {"action": "expectCount", "selector": "[data-testid=\"timegrid-event\"]", "count": 7},
+
+        {"action": "drag", "selector": "[data-testid=\"timegrid-column\"]:nth-child(4) [data-testid=\"timegrid-event\"]", "byY": 112},
+        {"action": "waitFor", "selector": "[data-testid=\"event-scope-modal\"]"},
+
+        {
+          "action": "seedRaw",
+          "sql": "UPDATE app_calendar__events SET updated_at=datetime('now','+1 minute') WHERE id = ?",
+          "params": ["ui-drag-ex-race"]
+        },
+
+        {"action": "click", "selector": "[data-testid=\"scope-option\"][data-scope=\"this\"]"},
+        {"action": "waitFor", "selector": "[data-testid=\"write-error\"]"},
+
+        {"action": "reload"},
+        {"action": "waitFor", "selector": "[data-testid=\"time-grid\"]"},
+        {"action": "click", "selector": "[data-testid=\"timegrid-column\"]:nth-child(4) [data-testid=\"timegrid-event\"]"},
+        {"action": "waitFor", "selector": "[data-testid=\"event-detail\"]"},
+        {"action": "expectText", "text": "11 AM \u2013 12 PM", "selector": "[data-testid=\"event-detail\"]"}
+      ]
+    },
+    {
+      "name": "a series deleted while the scope picker is open refuses the override instead of orphaning it",
+      "members": { "member": "adult" },
+      "expectsRefusedWrite": true,
+      "steps": [
+        {
+          "action": "seedRaw",
+          "sql": "INSERT INTO app_calendar__events (id, title, start_date, start_time, end_date, end_time, all_day, recurrence, visibility, source, created_by, created_at, updated_at) VALUES (?, ?, date('now','weekday 0','-6 days'), '09:00', date('now','weekday 0','-6 days'), '10:00', 0, ?, 'everyone', 'local', ?, datetime('now'), datetime('now'))",
+          "params": ["ui-drag-race-this", "Choir practice", "{\"freq\":\"daily\"}", "{{member}}"]
+        },
+
+        { "action": "open" },
+        { "action": "waitFor", "selector": "[data-testid=\"timegrid-column\"]:nth-child(1) [data-testid=\"timegrid-event\"]" },
+        { "action": "expectCount", "selector": "[data-testid=\"timegrid-event\"]", "count": 7 },
+
+        { "action": "drag", "selector": "[data-testid=\"timegrid-column\"]:nth-child(1) [data-testid=\"timegrid-event\"]", "byY": 112 },
+        { "action": "waitFor", "selector": "[data-testid=\"event-scope-modal\"]" },
+
+        {
+          "action": "seedRaw",
+          "sql": "DELETE FROM app_calendar__events WHERE id = ?",
+          "params": ["ui-drag-race-this"]
+        },
+
+        { "action": "click", "selector": "[data-testid=\"scope-option\"][data-scope=\"this\"]" },
+        { "action": "waitFor", "selector": "[data-testid=\"write-error\"]" },
+
+        { "action": "reload" },
+        { "action": "waitFor", "selector": "[data-testid=\"time-grid\"]" },
+        { "action": "expectCount", "selector": "[data-testid=\"timegrid-event\"]", "count": 0 }
+      ]
+    },
+    {
+      "name": "a series edited while the scope picker is open refuses the split instead of overwriting the edit",
+      "members": { "member": "adult" },
+      "expectsRefusedWrite": true,
+      "steps": [
+        {
+          "action": "seedRaw",
+          "sql": "INSERT INTO app_calendar__events (id, title, start_date, start_time, end_date, end_time, all_day, recurrence, visibility, source, created_by, created_at, updated_at) VALUES (?, ?, date('now','weekday 0','-6 days'), '09:00', date('now','weekday 0','-6 days'), '10:00', 0, ?, 'everyone', 'local', ?, datetime('now'), datetime('now'))",
+          "params": ["ui-drag-race-edit", "Swim squad", "{\"freq\":\"daily\"}", "{{member}}"]
+        },
+
+        { "action": "open" },
+        { "action": "waitFor", "selector": "[data-testid=\"timegrid-column\"]:nth-child(1) [data-testid=\"timegrid-event\"]" },
+        { "action": "expectCount", "selector": "[data-testid=\"timegrid-event\"]", "count": 7 },
+
+        { "action": "drag", "selector": "[data-testid=\"timegrid-column\"]:nth-child(4) [data-testid=\"timegrid-event\"]", "byY": 112 },
+        { "action": "waitFor", "selector": "[data-testid=\"event-scope-modal\"]" },
+
+        {
+          "action": "seedRaw",
+          "sql": "UPDATE app_calendar__events SET start_time = '14:00', end_time = '15:00', updated_at = datetime('now','+1 hour') WHERE id = ?",
+          "params": ["ui-drag-race-edit"]
+        },
+
+        { "action": "click", "selector": "[data-testid=\"scope-option\"][data-scope=\"following\"]" },
+        { "action": "waitFor", "selector": "[data-testid=\"write-error\"]" },
+
+        { "action": "reload" },
+        { "action": "waitFor", "selector": "[data-testid=\"timegrid-column\"]:nth-child(1) [data-testid=\"timegrid-event\"]" },
+        { "action": "expectCount", "selector": "[data-testid=\"timegrid-event\"]", "count": 7 },
+
+        { "action": "click", "selector": "[data-testid=\"timegrid-column\"]:nth-child(4) [data-testid=\"timegrid-event\"]" },
+        { "action": "waitFor", "selector": "[data-testid=\"event-detail\"]" },
+        { "action": "expectText", "text": "2 PM \u2013 3 PM", "selector": "[data-testid=\"event-detail\"]" },
+        { "action": "expectNoText", "text": "11 AM \u2013 12 PM", "selector": "[data-testid=\"event-detail\"]" }
+      ]
+    },
+    {
+      "name": "two members overriding the same occurrence at once refuses the second instead of hiding it",
+      "members": { "first": "adult", "second": "adult" },
+      "expectsRefusedWrite": true,
+      "steps": [
+        {
+          "action": "seedRaw",
+          "sql": "INSERT INTO app_calendar__events (id, title, start_date, start_time, end_date, end_time, all_day, recurrence, visibility, source, created_by, created_at, updated_at) VALUES (?, ?, date('now','weekday 0','-6 days'), '09:00', date('now','weekday 0','-6 days'), '10:00', 0, ?, 'everyone', 'local', ?, datetime('now'), datetime('now'))",
+          "params": ["ui-drag-race-dup", "Study group", "{\"freq\":\"daily\"}", "{{first}}"]
+        },
+
+        { "action": "open", "as": "first" },
+        { "action": "waitFor", "as": "first", "selector": "[data-testid=\"timegrid-column\"]:nth-child(1) [data-testid=\"timegrid-event\"]" },
+        { "action": "open", "as": "second" },
+        { "action": "waitFor", "as": "second", "selector": "[data-testid=\"timegrid-column\"]:nth-child(1) [data-testid=\"timegrid-event\"]" },
+
+        { "action": "drag", "as": "first", "selector": "[data-testid=\"timegrid-column\"]:nth-child(1) [data-testid=\"timegrid-event\"]", "byY": 112 },
+        { "action": "waitFor", "as": "first", "selector": "[data-testid=\"event-scope-modal\"]" },
+        { "action": "drag", "as": "second", "selector": "[data-testid=\"timegrid-column\"]:nth-child(1) [data-testid=\"timegrid-event\"]", "byY": 224 },
+        { "action": "waitFor", "as": "second", "selector": "[data-testid=\"event-scope-modal\"]" },
+
+        { "action": "click", "as": "first", "selector": "[data-testid=\"scope-option\"][data-scope=\"this\"]" },
+        { "action": "waitFor", "as": "first", "selector": "[data-testid=\"event-detail-dismiss\"]", "state": "detached" },
+
+        { "action": "click", "as": "second", "selector": "[data-testid=\"scope-option\"][data-scope=\"this\"]" },
+        { "action": "waitFor", "as": "second", "selector": "[data-testid=\"write-error\"]" },
+
+        { "action": "reload", "as": "first" },
+        { "action": "waitFor", "as": "first", "selector": "[data-testid=\"timegrid-column\"]:nth-child(1) [data-testid=\"timegrid-event\"]" },
+        { "action": "expectCount", "as": "first", "selector": "[data-testid=\"timegrid-event\"]", "count": 7 },
+        { "action": "click", "as": "first", "selector": "[data-testid=\"timegrid-column\"]:nth-child(1) [data-testid=\"timegrid-event\"]" },
+        { "action": "waitFor", "as": "first", "selector": "[data-testid=\"event-detail\"]" },
+        { "action": "expectText", "as": "first", "text": "11 AM \u2013 12 PM", "selector": "[data-testid=\"event-detail\"]" },
+        { "action": "expectNoText", "as": "first", "text": "1 PM \u2013 2 PM", "selector": "[data-testid=\"event-detail\"]" }
+      ]
+    },
+    {
+      "name": "choosing This event on a date that already has its own override opens that override, not the series",
+      "members": {"member": "adult"},
+      "steps": [
+        {
+          "action": "seedRaw",
+          "sql": "INSERT INTO app_calendar__events (id, title, start_date, start_time, end_date, end_time, all_day, recurrence, visibility, source, created_by, created_at, updated_at) VALUES (?, ?, date('now','weekday 0','-6 days'), '09:00', date('now','weekday 0','-6 days'), '10:00', 0, ?, 'everyone', 'local', ?, datetime('now'), datetime('now'))",
+          "params": ["ui-open-override", "Reading hour", "{\"freq\":\"daily\"}", "{{member}}"]
+        },
+        {
+          "action": "seedRaw",
+          "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, recurring_event_id, original_date, visibility, source, created_by, created_at, updated_at) VALUES (?, ?, ?, date('now','weekday 0','-6 days'), '11:00', date('now','weekday 0','-6 days'), '12:00', 0, ?, date('now','weekday 0','-6 days'), 'everyone', 'local', ?, datetime('now'), datetime('now'))",
+          "params": ["ui-open-override-ex", "Reading hour rescheduled", "Back room", "ui-open-override", "{{member}}"]
+        },
+        {"action": "open"},
+        {"action": "waitFor", "selector": "[data-testid=\"timegrid-column\"]:nth-child(1) [data-testid=\"timegrid-event\"]"},
+        {"action": "click", "selector": "[data-testid=\"timegrid-column\"]:nth-child(1) [data-testid=\"timegrid-event\"]"},
+        {"action": "waitFor", "selector": "[data-testid=\"event-detail\"]"},
+        {"action": "click", "selector": "[data-testid=\"event-edit\"]"},
+        {"action": "waitFor", "selector": "[data-testid=\"event-scope-modal\"]"},
+        {"action": "click", "selector": "[data-testid=\"scope-option\"][data-scope=\"this\"]"},
+        {"action": "waitFor", "selector": "[data-testid=\"field-title\"]"},
+
+        {"action": "expectCount", "selector": "[data-testid=\"field-title\"][value=\"Reading hour rescheduled\"]", "count": 1},
+        {"action": "expectCount", "selector": "[data-testid=\"field-start-time\"][value=\"11:00\"]", "count": 1},
+        {"action": "expectCount", "selector": "[data-testid=\"field-location\"][value=\"Back room\"]", "count": 1},
+
+        {"action": "fill", "selector": "[data-testid=\"field-description\"]", "value": "notes"},
+        {"action": "click", "selector": "[data-testid=\"event-edit-submit\"]"},
+        {"action": "expectCount", "selector": "[data-testid=\"write-error\"]", "count": 0},
+        {"action": "reload"},
+        {"action": "waitFor", "selector": "[data-testid=\"time-grid\"]"},
+        {"action": "click", "selector": "[data-testid=\"timegrid-column\"]:nth-child(1) [data-testid=\"timegrid-event\"]"},
+        {"action": "waitFor", "selector": "[data-testid=\"event-detail\"]"},
+        {"action": "expectText", "text": "Reading hour rescheduled", "selector": "[data-testid=\"event-detail\"]"},
+        {"action": "expectText", "text": "11 AM \u2013 12 PM", "selector": "[data-testid=\"event-detail\"]"}
+      ]
+    },
+    {
+      "name": "an event moved elsewhere while its edit form is open refuses the save instead of replaying stale times",
+      "members": {"member": "adult"},
+      "expectsRefusedWrite": true,
+      "steps": [
+        {
+          "action": "seedRaw",
+          "sql": "INSERT INTO app_calendar__events (id, title, start_date, start_time, end_date, end_time, all_day, visibility, source, created_by, created_at, updated_at) VALUES (?, ?, date('now'), '09:00', date('now'), '10:00', 0, 'everyone', 'local', ?, datetime('now'), datetime('now'))",
+          "params": ["ui-form-stale", "Standup", "{{member}}"]
+        },
+        {"action": "open"},
+        {"action": "waitFor", "selector": "[data-testid=\"timegrid-event\"]"},
+        {"action": "click", "selector": "[data-testid=\"timegrid-event\"]"},
+        {"action": "waitFor", "selector": "[data-testid=\"event-detail\"]"},
+        {"action": "click", "selector": "[data-testid=\"event-edit\"]"},
+        {"action": "waitFor", "selector": "[data-testid=\"field-title\"]"},
+        {"action": "fill", "selector": "[data-testid=\"field-title\"]", "value": "Standup renamed"},
+        {
+          "action": "seedRaw",
+          "sql": "UPDATE app_calendar__events SET start_time='14:00', end_time='15:00', updated_at=datetime('now','+1 minute') WHERE id = ?",
+          "params": ["ui-form-stale"]
+        },
+        {"action": "click", "selector": "[data-testid=\"event-edit-submit\"]"},
+        {"action": "waitFor", "selector": "[data-testid=\"write-error\"]"},
+        {"action": "reload"},
+        {"action": "waitFor", "selector": "[data-testid=\"time-grid\"]"},
+        {"action": "click", "selector": "[data-testid=\"timegrid-event\"]"},
+        {"action": "waitFor", "selector": "[data-testid=\"event-detail\"]"},
+        {"action": "expectText", "text": "2 PM \u2013 3 PM", "selector": "[data-testid=\"event-detail\"]"},
+        {"action": "expectNoText", "text": "renamed", "selector": "[data-testid=\"event-detail\"]"}
+      ]
+    },
+    {
+      "name": "a series changed while an occurrence's edit form is open refuses the override instead of saving it under a series that moved",
+      "members": {"member": "adult"},
+      "expectsRefusedWrite": true,
+      "steps": [
+        {
+          "action": "seedRaw",
+          "sql": "INSERT INTO app_calendar__events (id, title, start_date, start_time, end_date, end_time, all_day, recurrence, visibility, source, created_by, created_at, updated_at) VALUES (?, ?, date('now','weekday 0','-6 days'), '09:00', date('now','weekday 0','-6 days'), '10:00', 0, ?, 'everyone', 'local', ?, datetime('now'), datetime('now'))",
+          "params": ["ui-form-parent-race", "Reading hour", "{\"freq\":\"daily\"}", "{{member}}"]
+        },
+        {
+          "action": "seedRaw",
+          "sql": "INSERT INTO app_calendar__events (id, title, start_date, start_time, end_date, end_time, all_day, recurring_event_id, original_date, visibility, source, created_by, created_at, updated_at) VALUES (?, ?, date('now','weekday 0','-6 days'), '11:00', date('now','weekday 0','-6 days'), '12:00', 0, ?, date('now','weekday 0','-6 days'), 'everyone', 'local', ?, datetime('now'), datetime('now'))",
+          "params": ["ui-form-parent-race-ex", "Reading hour", "ui-form-parent-race", "{{member}}"]
+        },
+        {"action": "open"},
+        {"action": "waitFor", "selector": "[data-testid=\"timegrid-column\"]:nth-child(1) [data-testid=\"timegrid-event\"]"},
+        {"action": "click", "selector": "[data-testid=\"timegrid-column\"]:nth-child(1) [data-testid=\"timegrid-event\"]"},
+        {"action": "waitFor", "selector": "[data-testid=\"event-detail\"]"},
+        {"action": "click", "selector": "[data-testid=\"event-edit\"]"},
+        {"action": "waitFor", "selector": "[data-testid=\"event-scope-modal\"]"},
+        {"action": "click", "selector": "[data-testid=\"scope-option\"][data-scope=\"this\"]"},
+        {"action": "waitFor", "selector": "[data-testid=\"field-title\"]"},
+        {"action": "fill", "selector": "[data-testid=\"field-title\"]", "value": "Reading hour moved"},
+        {
+          "action": "seedRaw",
+          "sql": "UPDATE app_calendar__events SET updated_at=datetime('now','+1 minute') WHERE id = ?",
+          "params": ["ui-form-parent-race"]
+        },
+        {"action": "click", "selector": "[data-testid=\"event-edit-submit\"]"},
+        {"action": "waitFor", "selector": "[data-testid=\"write-error\"]"},
+        {"action": "reload"},
+        {"action": "waitFor", "selector": "[data-testid=\"time-grid\"]"},
+        {"action": "expectCount", "selector": "[data-testid=\"timegrid-event\"]", "count": 7},
+        {"action": "expectNoText", "text": "moved", "selector": "[data-testid=\"time-grid\"]"}
+      ]
+    },
+    {
+      "name": "editing one occurrence through the form changes only that date",
+      "members": {"member": "adult"},
+      "steps": [
+        {
+          "action": "seedRaw",
+          "sql": "INSERT INTO app_calendar__events (id, title, start_date, start_time, end_date, end_time, all_day, recurrence, visibility, source, created_by, created_at, updated_at) VALUES (?, ?, date('now','weekday 0','-6 days'), '09:00', date('now','weekday 0','-6 days'), '10:00', 0, ?, 'everyone', 'local', ?, datetime('now'), datetime('now'))",
+          "params": ["ui-form-edit-this", "Reading hour", "{\"freq\":\"daily\"}", "{{member}}"]
+        },
+        {"action": "open"},
+        {"action": "waitFor", "selector": "[data-testid=\"timegrid-column\"]:nth-child(1) [data-testid=\"timegrid-event\"]"},
+        {"action": "expectCount", "selector": "[data-testid=\"timegrid-event\"]", "count": 7},
+        {"action": "click", "selector": "[data-testid=\"timegrid-column\"]:nth-child(1) [data-testid=\"timegrid-event\"]"},
+        {"action": "waitFor", "selector": "[data-testid=\"event-detail\"]"},
+        {"action": "click", "selector": "[data-testid=\"event-edit\"]"},
+        {"action": "waitFor", "selector": "[data-testid=\"event-scope-modal\"]"},
+        {"action": "click", "selector": "[data-testid=\"scope-option\"][data-scope=\"this\"]"},
+        {"action": "waitFor", "selector": "[data-testid=\"field-title\"]"},
+        {"action": "fill", "selector": "[data-testid=\"field-title\"]", "value": "Reading hour moved"},
+        {"action": "click", "selector": "[data-testid=\"event-edit-submit\"]"},
+        {"action": "expectCount", "selector": "[data-testid=\"write-error\"]", "count": 0},
+        {"action": "reload"},
+        {"action": "waitFor", "selector": "[data-testid=\"time-grid\"]"},
+        {"action": "expectCount", "selector": "[data-testid=\"timegrid-event\"]", "count": 7},
+        {"action": "click", "selector": "[data-testid=\"timegrid-column\"]:nth-child(1) [data-testid=\"timegrid-event\"]"},
+        {"action": "waitFor", "selector": "[data-testid=\"event-detail\"]"},
+        {"action": "expectText", "text": "Reading hour moved", "selector": "[data-testid=\"event-detail\"]"},
+        {"action": "click", "selector": "[data-testid=\"event-detail-dismiss\"]"},
+        {"action": "click", "selector": "[data-testid=\"timegrid-column\"]:nth-child(2) [data-testid=\"timegrid-event\"]"},
+        {"action": "waitFor", "selector": "[data-testid=\"event-detail\"]"},
+        {"action": "expectText", "text": "Reading hour", "selector": "[data-testid=\"event-detail\"]"},
+        {"action": "expectNoText", "text": "moved", "selector": "[data-testid=\"event-detail\"]"},
+        {"action": "click", "selector": "[data-testid=\"event-detail-dismiss\"]"}
+      ]
+    },
+    {
+      "name": "deleting a whole series takes its overrides with it",
+      "members": {"member": "adult"},
+      "steps": [
+        {"action": "seedRaw", "sql": "INSERT INTO app_calendar__events (id, title, start_date, start_time, end_date, end_time, all_day, recurrence, visibility, source, created_by, created_at, updated_at) VALUES (?, ?, date('now','weekday 0','-6 days'), '09:00', date('now','weekday 0','-6 days'), '10:00', 0, ?, 'everyone', 'local', ?, datetime('now'), datetime('now'))", "params": ["ui-del-all", "Book club", "{\"freq\":\"daily\"}", "{{member}}"]},
+        {"action": "seedRaw", "sql": "INSERT INTO app_calendar__events (id, title, start_date, start_time, end_date, end_time, all_day, recurring_event_id, original_date, visibility, source, created_by, created_at, updated_at) VALUES (?, ?, date('now','weekday 0','-6 days'), '11:00', date('now','weekday 0','-6 days'), '12:00', 0, ?, date('now','weekday 0','-6 days'), 'everyone', 'local', ?, datetime('now'), datetime('now'))", "params": ["ui-del-all-ex", "Book club moved", "ui-del-all", "{{member}}"]},
+        {"action": "open"},
+        {"action": "waitFor", "selector": "[data-testid=\"timegrid-column\"]:nth-child(1) [data-testid=\"timegrid-event\"]"},
+        {"action": "expectCount", "selector": "[data-testid=\"timegrid-event\"]", "count": 7},
+        {"action": "click", "selector": "[data-testid=\"timegrid-column\"]:nth-child(2) [data-testid=\"timegrid-event\"]"},
+        {"action": "waitFor", "selector": "[data-testid=\"event-detail\"]"},
+        {"action": "click", "selector": "[data-testid=\"event-delete\"]"},
+        {"action": "waitFor", "selector": "[data-testid=\"event-scope-modal\"]"},
+        {"action": "click", "selector": "[data-testid=\"scope-option\"][data-scope=\"all\"]"},
+        {"action": "expectCount", "selector": "[data-testid=\"write-error\"]", "count": 0},
+        {"action": "reload"},
+        {"action": "waitFor", "selector": "[data-testid=\"time-grid\"]"},
+        {"action": "expectCount", "selector": "[data-testid=\"timegrid-event\"]", "count": 0},
+        {"action": "expectNoText", "text": "Book club", "selector": "[data-testid=\"time-grid\"]"}
+      ]
+    },
+    {
+      "name": "a series changed while the delete picker is open refuses the delete instead of removing it",
+      "members": {"member": "adult"},
+      "expectsRefusedWrite": true,
+      "steps": [
+        {"action": "seedRaw", "sql": "INSERT INTO app_calendar__events (id, title, start_date, start_time, end_date, end_time, all_day, recurrence, visibility, source, created_by, created_at, updated_at) VALUES (?, ?, date('now','weekday 0','-6 days'), '09:00', date('now','weekday 0','-6 days'), '10:00', 0, ?, 'everyone', 'local', ?, datetime('now'), datetime('now'))", "params": ["ui-del-race", "Book club", "{\"freq\":\"daily\"}", "{{member}}"]},
+        {"action": "open"},
+        {"action": "waitFor", "selector": "[data-testid=\"timegrid-column\"]:nth-child(1) [data-testid=\"timegrid-event\"]"},
+        {"action": "click", "selector": "[data-testid=\"timegrid-column\"]:nth-child(2) [data-testid=\"timegrid-event\"]"},
+        {"action": "waitFor", "selector": "[data-testid=\"event-detail\"]"},
+        {"action": "click", "selector": "[data-testid=\"event-delete\"]"},
+        {"action": "waitFor", "selector": "[data-testid=\"event-scope-modal\"]"},
+        {
+          "action": "seedRaw",
+          "sql": "UPDATE app_calendar__events SET start_time='14:00', end_time='15:00', updated_at=datetime('now','+1 minute') WHERE id = ?",
+          "params": ["ui-del-race"]
+        },
+        {"action": "click", "selector": "[data-testid=\"scope-option\"][data-scope=\"all\"]"},
+        {"action": "waitFor", "selector": "[data-testid=\"write-error\"]"},
+        {"action": "reload"},
+        {"action": "waitFor", "selector": "[data-testid=\"time-grid\"]"},
+        {"action": "expectCount", "selector": "[data-testid=\"timegrid-event\"]", "count": 7},
+        {"action": "click", "selector": "[data-testid=\"timegrid-column\"]:nth-child(2) [data-testid=\"timegrid-event\"]"},
+        {"action": "waitFor", "selector": "[data-testid=\"event-detail\"]"},
+        {"action": "expectText", "text": "2 PM \u2013 3 PM", "selector": "[data-testid=\"event-detail\"]"}
+      ]
+    },
+    {
+      "name": "deleting one occurrence through the form removes only that date",
+      "members": {"member": "adult"},
+      "steps": [
+        {
+          "action": "seedRaw",
+          "sql": "INSERT INTO app_calendar__events (id, title, start_date, start_time, end_date, end_time, all_day, recurrence, visibility, source, created_by, created_at, updated_at) VALUES (?, ?, date('now','weekday 0','-6 days'), '09:00', date('now','weekday 0','-6 days'), '10:00', 0, ?, 'everyone', 'local', ?, datetime('now'), datetime('now'))",
+          "params": ["ui-form-del-this", "Team sync", "{\"freq\":\"daily\"}", "{{member}}"]
+        },
+        {"action": "open"},
+        {"action": "waitFor", "selector": "[data-testid=\"timegrid-column\"]:nth-child(1) [data-testid=\"timegrid-event\"]"},
+        {"action": "expectCount", "selector": "[data-testid=\"timegrid-event\"]", "count": 7},
+        {"action": "click", "selector": "[data-testid=\"timegrid-column\"]:nth-child(1) [data-testid=\"timegrid-event\"]"},
+        {"action": "waitFor", "selector": "[data-testid=\"event-detail\"]"},
+        {"action": "click", "selector": "[data-testid=\"event-delete\"]"},
+        {"action": "waitFor", "selector": "[data-testid=\"event-scope-modal\"]"},
+        {"action": "click", "selector": "[data-testid=\"scope-option\"][data-scope=\"this\"]"},
+        {"action": "expectCount", "selector": "[data-testid=\"write-error\"]", "count": 0},
+        {"action": "reload"},
+        {"action": "waitFor", "selector": "[data-testid=\"time-grid\"]"},
+        {"action": "expectCount", "selector": "[data-testid=\"timegrid-event\"]", "count": 6},
+        {"action": "expectCount", "selector": "[data-testid=\"timegrid-column\"]:nth-child(1) [data-testid=\"timegrid-event\"]", "count": 0},
+        {"action": "expectCount", "selector": "[data-testid=\"timegrid-column\"]:nth-child(2) [data-testid=\"timegrid-event\"]", "count": 1}
+      ]
+    },
+    {
+      "name": "deleting this and following through the form truncates the series",
+      "members": {"member": "adult"},
+      "steps": [
+        {
+          "action": "seedRaw",
+          "sql": "INSERT INTO app_calendar__events (id, title, start_date, start_time, end_date, end_time, all_day, recurrence, visibility, source, created_by, created_at, updated_at) VALUES (?, ?, date('now','weekday 0','-6 days'), '09:00', date('now','weekday 0','-6 days'), '10:00', 0, ?, 'everyone', 'local', ?, datetime('now'), datetime('now'))",
+          "params": ["ui-form-del-following", "Late study", "{\"freq\":\"daily\"}", "{{member}}"]
+        },
+        {"action": "open"},
+        {"action": "waitFor", "selector": "[data-testid=\"timegrid-column\"]:nth-child(1) [data-testid=\"timegrid-event\"]"},
+        {"action": "expectCount", "selector": "[data-testid=\"timegrid-event\"]", "count": 7},
+        {"action": "click", "selector": "[data-testid=\"timegrid-column\"]:nth-child(4) [data-testid=\"timegrid-event\"]"},
+        {"action": "waitFor", "selector": "[data-testid=\"event-detail\"]"},
+        {"action": "click", "selector": "[data-testid=\"event-delete\"]"},
+        {"action": "waitFor", "selector": "[data-testid=\"event-scope-modal\"]"},
+        {"action": "click", "selector": "[data-testid=\"scope-option\"][data-scope=\"following\"]"},
+        {"action": "expectCount", "selector": "[data-testid=\"write-error\"]", "count": 0},
+        {"action": "reload"},
+        {"action": "waitFor", "selector": "[data-testid=\"time-grid\"]"},
+        {"action": "expectCount", "selector": "[data-testid=\"timegrid-event\"]", "count": 3},
+        {"action": "expectCount", "selector": "[data-testid=\"timegrid-column\"]:nth-child(3) [data-testid=\"timegrid-event\"]", "count": 1},
+        {"action": "expectCount", "selector": "[data-testid=\"timegrid-column\"]:nth-child(4) [data-testid=\"timegrid-event\"]", "count": 0}
+      ]
+    },
+    {
+      "name": "dismissing the scope picker writes nothing to the series",
+      "members": { "member": "adult" },
+      "steps": [
+        {
+          "action": "seedRaw",
+          "sql": "INSERT INTO app_calendar__events (id, title, start_date, start_time, end_date, end_time, all_day, recurrence, visibility, source, created_by, created_at, updated_at) VALUES (?, ?, date('now','weekday 0','-6 days'), '09:00', date('now','weekday 0','-6 days'), '10:00', 0, ?, 'everyone', 'local', ?, datetime('now'), datetime('now'))",
+          "params": ["ui-drag-series-cancel", "Dog walk", "{\"freq\":\"daily\"}", "{{member}}"]
+        },
+
+        { "action": "open" },
+        { "action": "waitFor", "selector": "[data-testid=\"timegrid-column\"]:nth-child(1) [data-testid=\"timegrid-event\"]" },
+        { "action": "expectCount", "selector": "[data-testid=\"timegrid-event\"]", "count": 7 },
+
+        { "action": "drag", "selector": "[data-testid=\"timegrid-column\"]:nth-child(1) [data-testid=\"timegrid-event\"]", "byY": 112 },
+        { "action": "waitFor", "selector": "[data-testid=\"event-scope-modal\"]" },
+        { "action": "click", "selector": "[data-testid=\"modal-cancel\"]" },
+        { "action": "expectCount", "selector": "[data-testid=\"write-error\"]", "count": 0 },
+
+        { "action": "click", "selector": "[data-testid=\"timegrid-column\"]:nth-child(1) [data-testid=\"timegrid-event\"]" },
+        { "action": "waitFor", "selector": "[data-testid=\"event-detail\"]" },
+        { "action": "expectText", "text": "9 AM \u2013 10 AM", "selector": "[data-testid=\"event-detail\"]" },
+        { "action": "expectNoText", "text": "11 AM \u2013 12 PM", "selector": "[data-testid=\"event-detail\"]" },
+        { "action": "click", "selector": "[data-testid=\"event-detail-dismiss\"]" },
+
+        { "action": "reload" },
+        { "action": "waitFor", "selector": "[data-testid=\"timegrid-column\"]:nth-child(1) [data-testid=\"timegrid-event\"]" },
+        { "action": "expectCount", "selector": "[data-testid=\"timegrid-event\"]", "count": 7 },
+
+        { "action": "click", "selector": "[data-testid=\"timegrid-column\"]:nth-child(1) [data-testid=\"timegrid-event\"]" },
+        { "action": "waitFor", "selector": "[data-testid=\"event-detail\"]" },
+        { "action": "expectText", "text": "9 AM \u2013 10 AM", "selector": "[data-testid=\"event-detail\"]" },
+        { "action": "click", "selector": "[data-testid=\"event-detail-dismiss\"]" }
       ]
     }
   ]

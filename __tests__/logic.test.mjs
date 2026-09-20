@@ -11,7 +11,10 @@ import {
   applyMove, applyResize, isDraggableEvent, createPendingDrags,
   pickColumnDate, applyMoveAcrossDays, autoScrollVelocity, isNoopDragPatch,
   dragChangesDate,
+  isSeriesOccurrence, isSeriesException, dragMayChangeDay, splitRecurrence,
+  seriesConflictCandidate,
   AUTOSCROLL_ZONE_PX, AUTOSCROLL_MAX_PX,
+  updateEvent, claimSeries, insertOverride, insertSeries, editTargetFor, dropIsStale,
 } from "../src/logic.js";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -507,10 +510,26 @@ describe("isDraggableEvent", () => {
     expect(isDraggableEvent(timed(null), ok)).toBe(false);
   });
 
-  it("refuses every shape of recurring occurrence", () => {
-    expect(isDraggableEvent({ ...timed("09:00"), recurrence: '{"freq":"weekly"}' }, ok)).toBe(false);
-    expect(isDraggableEvent({ ...timed("09:00"), recurring_event_id: "p1" }, ok)).toBe(false);
-    expect(isDraggableEvent({ ...timed("09:00"), _virtual: true, _primaryId: "p1" }, ok)).toBe(false);
+  it("accepts every shape of recurring occurrence", () => {
+    // Recurring occurrences ARE draggable; what their drop writes is decided
+    // by the scope picker, not by this gate. dragMayChangeDay is the narrower
+    // rule that still applies to them.
+    expect(isDraggableEvent({ ...timed("09:00"), recurrence: '{"freq":"weekly"}' }, ok)).toBe(true);
+    expect(isDraggableEvent({ ...timed("09:00"), recurring_event_id: "p1" }, ok)).toBe(true);
+    expect(isDraggableEvent({ ...timed("09:00"), _virtual: true, _primaryId: "p1" }, ok)).toBe(true);
+  });
+
+  it("still refuses a recurring occurrence that fails any other rule", () => {
+    // Admitting recurrence must not have widened the gate for anything else:
+    // a recurring row is checked against every remaining exclusion exactly as
+    // a standalone one is.
+    const occ = { ...timed("09:00", "10:00"), _virtual: true, _primaryId: "p1" };
+    expect(isDraggableEvent(occ, { canWrite: false })).toBe(false);
+    expect(isDraggableEvent({ ...occ, source: "synced" }, ok)).toBe(false);
+    expect(isDraggableEvent({ ...occ, all_day: 1 }, ok)).toBe(false);
+    expect(isDraggableEvent({ ...occ, end_date: "2026-09-20" }, ok)).toBe(false);
+    expect(isDraggableEvent({ ...occ, is_cancelled: 1 }, ok)).toBe(false);
+    expect(isDraggableEvent({ ...occ, start_time: "22:00", end_time: "23:50" }, ok)).toBe(false);
   });
 
   it("refuses a multi-day event", () => {
@@ -987,5 +1006,383 @@ describe("dragChangesDate", () => {
   it("has nothing to compare without a row or a patch", () => {
     expect(dragChangesDate(ev, null)).toBe(false);
     expect(dragChangesDate(null, applyMoveAcrossDays(ev, 0, 56, "2026-09-21"))).toBe(false);
+  });
+});
+
+// ── Recurring drags ───────────────────────────────────────────────────────────
+
+describe("isSeriesOccurrence", () => {
+  it("recognizes all three shapes the expansion produces", () => {
+    expect(isSeriesOccurrence({ recurrence: '{"freq":"weekly"}' })).toBe(true);
+    expect(isSeriesOccurrence({ recurring_event_id: "p1" })).toBe(true);
+    expect(isSeriesOccurrence({ _virtual: true, _primaryId: "p1" })).toBe(true);
+    expect(isSeriesOccurrence({ _primaryId: "p1" })).toBe(true);
+  });
+
+  it("does not treat a standalone event as one", () => {
+    expect(isSeriesOccurrence(timed("09:00", "10:00"))).toBe(false);
+    // The columns exist on every row; only a non-null value means a series.
+    expect(isSeriesOccurrence({ ...timed("09:00"), recurrence: null, recurring_event_id: null })).toBe(false);
+  });
+
+  it("is false rather than nullish for a missing row", () => {
+    // The drag stores this on dragState and reads it back as a branch
+    // condition; `undefined && ...` would read as "not a series" by accident
+    // rather than by decision.
+    expect(isSeriesOccurrence(null)).toBe(false);
+    expect(isSeriesOccurrence(undefined)).toBe(false);
+  });
+});
+
+describe("isSeriesException", () => {
+  it("is true for a stored exception row, expanded or raw", () => {
+    // The expansion spreads the stored row into the occurrence it emits, so
+    // the column survives — which is what lets one predicate serve both.
+    expect(isSeriesException({ recurring_event_id: "p1" })).toBe(true);
+    expect(isSeriesException({ recurring_event_id: "p1", _primaryId: "p1", _occDate: "2026-09-21" })).toBe(true);
+  });
+
+  it("is false for a virtual occurrence, which has no row of its own", () => {
+    // A virtual occurrence is spread from the PRIMARY, which carries the
+    // column null. Reading _virtual instead would be reading a marker the
+    // expansion happens to set; this reads the thing that makes it true.
+    expect(isSeriesException({ recurring_event_id: null, _virtual: true, _primaryId: "p1" })).toBe(false);
+    expect(isSeriesException({ ...timed("09:00"), _virtual: true, _primaryId: "p1" })).toBe(false);
+  });
+
+  it("is false for a standalone event and a missing row", () => {
+    expect(isSeriesException(timed("09:00", "10:00"))).toBe(false);
+    expect(isSeriesException(null)).toBe(false);
+  });
+});
+
+describe("dragMayChangeDay", () => {
+  it("lets a standalone event change day", () => {
+    expect(dragMayChangeDay(timed("09:00", "10:00"))).toBe(true);
+  });
+
+  it("holds a recurring occurrence on its own day", () => {
+    // Two of the three scopes a drop offers cannot honour a new date — see the
+    // function's own note — so the preview must never promise one.
+    expect(dragMayChangeDay({ ...timed("09:00"), _virtual: true, _primaryId: "p1" })).toBe(false);
+    expect(dragMayChangeDay({ ...timed("09:00"), recurring_event_id: "p1" })).toBe(false);
+    expect(dragMayChangeDay({ ...timed("09:00"), recurrence: '{"freq":"daily"}' })).toBe(false);
+  });
+
+  it("is what makes applyMoveAcrossDays hold the date", () => {
+    // The caller turns a false here into a null targetDate. This is the pair
+    // actually relied on, so it is asserted as a pair.
+    const occ = { ...timed("09:00", "10:00"), _virtual: true, _primaryId: "p1" };
+    const target = dragMayChangeDay(occ) ? "2026-09-25" : null;
+    const patch = applyMoveAcrossDays(occ, 0, 56, target);
+    expect(patch.start_date).toBe(occ.start_date);
+    expect(patch.end_date).toBe(occ.end_date);
+  });
+});
+
+describe("splitRecurrence", () => {
+  it("caps the head the day before the split", () => {
+    const { head } = splitRecurrence({ freq: "weekly", interval: 1 }, "2026-09-23");
+    expect(head.end_date).toBe("2026-09-22");
+    expect(head.freq).toBe("weekly");
+    expect(head.interval).toBe(1);
+  });
+
+  it("carries the rule unchanged into the tail when nothing is counted", () => {
+    const rule = { freq: "weekly", interval: 2, days: ["mon", "wed"] };
+    const { tail } = splitRecurrence(rule, "2026-09-23");
+    expect(tail).toEqual(rule);
+    // A copy, not the caller's object: both halves get stringified and written,
+    // and a shared reference would let one edit reach the other.
+    expect(tail).not.toBe(rule);
+  });
+
+  it("divides a counted rule instead of handing both halves the total", () => {
+    // The defect this function exists to prevent: a 10-occurrence series split
+    // after 3 becoming a 13-occurrence one.
+    const { head, tail } = splitRecurrence({ freq: "weekly", count: 10 }, "2026-10-07", 3);
+    expect(tail.count).toBe(7);
+    // The head is bounded by its date alone. Leaving a count on it as well is
+    // a second, differently-shaped bound on the same rule.
+    expect("count" in head).toBe(false);
+    expect(head.end_date).toBe("2026-10-06");
+  });
+
+  it("marks the head as ending on a date, not only giving it one", () => {
+    // The expansion reads end_date, so the cap bites straight away — but the
+    // edit form picks its control from end_type and rebuilds the rule from
+    // that control. A head left on "never" is capped until someone opens it
+    // and saves, at which point it starts generating over the tail again.
+    for (const endType of ["never", "count", "date"]) {
+      const { head } = splitRecurrence({ freq: "weekly", end_type: endType }, "2026-09-23", 2);
+      expect(head.end_type).toBe("date");
+      expect(head.end_date).toBe("2026-09-22");
+    }
+  });
+
+  it("leaves the tail's end mode alone", () => {
+    // The tail is the ORIGINAL series continuing: whatever end it always had —
+    // a count, a date, or nothing — is still the end it should have.
+    expect(splitRecurrence({ freq: "daily", end_type: "never" }, "2026-09-23").tail.end_type).toBe("never");
+    expect(splitRecurrence({ freq: "daily", end_type: "count", count: 9 }, "2026-09-23", 2).tail)
+      .toMatchObject({ end_type: "count", count: 7 });
+    expect(splitRecurrence({ freq: "daily", end_type: "date", end_date: "2026-12-31" }, "2026-09-23").tail)
+      .toMatchObject({ end_type: "date", end_date: "2026-12-31" });
+  });
+
+  it("never hands the tail a count of zero or less", () => {
+    // Reachable when the preceding count and the rule's count disagree — an
+    // expansion capped by its own range, for one. A count of 0 is a series
+    // that draws nothing and cannot be found to be deleted.
+    expect(splitRecurrence({ freq: "daily", count: 3 }, "2026-09-23", 3).tail.count).toBe(1);
+    expect(splitRecurrence({ freq: "daily", count: 3 }, "2026-09-23", 99).tail.count).toBe(1);
+  });
+
+  it("keeps an end_date the original rule already carried on the tail", () => {
+    // The head's cap is this split's; the tail still ends where the series
+    // always said it would.
+    const { head, tail } = splitRecurrence(
+      { freq: "weekly", end_date: "2026-12-31" }, "2026-09-23", 1,
+    );
+    expect(head.end_date).toBe("2026-09-22");
+    expect(tail.end_date).toBe("2026-12-31");
+  });
+
+  it("survives a missing rule", () => {
+    // primary.recurrence is parsed from a column that a concurrent edit can
+    // empty; `JSON.parse(x ?? "{}")` then yields {} and this must still return
+    // two usable rules rather than throwing into the drop's error toast.
+    const { head, tail } = splitRecurrence(null, "2026-09-23", 0);
+    expect(head).toEqual({ end_date: "2026-09-22", end_type: "date" });
+    expect(tail).toEqual({});
+  });
+});
+
+describe("seriesConflictCandidate", () => {
+  // An occurrence whose attendees were changed for that date alone — which the
+  // edit form's "this" scope does — standing in front of a series that still
+  // involves someone else entirely.
+  const primary = {
+    id: "p1", source: "local", all_day: 0, is_cancelled: 0,
+    start_date: "2026-09-14", end_date: "2026-09-14",
+    start_time: "09:00", end_time: "10:00",
+    attendee_ids: '["alice"]', recurrence: '{"freq":"daily"}',
+  };
+  const override = {
+    ...primary, id: "x1", recurring_event_id: "p1",
+    start_date: "2026-09-17", end_date: "2026-09-17",
+    attendee_ids: '["bob"]', _primaryId: "p1", _occDate: "2026-09-17",
+  };
+  const patch = { start_time: "11:00", end_time: "12:00", start_date: "2026-09-17", end_date: "2026-09-17" };
+  const call = (scope, ev, wholeSeries = false) =>
+    seriesConflictCandidate({ scope, wholeSeries, ev, primary, patch, occDate: "2026-09-17" });
+
+  it("checks a split against the SERIES' attendees, not the override's", () => {
+    // The tail is created from the primary's columns, so alice is who the new
+    // series will actually double-book — bob is not involved in it at all.
+    expect(call("following", override).attendee_ids).toBe('["alice"]');
+  });
+
+  it("checks the other scopes against the occurrence itself", () => {
+    // "this" writes the override, and "all" is only ever checked on the
+    // dropped date, where the override is what exists.
+    expect(call("this", override).attendee_ids).toBe('["bob"]');
+    expect(call("all", override).attendee_ids).toBe('["bob"]');
+  });
+
+  it("carries the dragged times into every candidate", () => {
+    for (const scope of ["this", "following", "all"]) {
+      expect(call(scope, override)).toMatchObject({ start_time: "11:00", end_time: "12:00" });
+    }
+  });
+
+  it("pins a split to the date the rule generated, not the override's own", () => {
+    // An override moved to another day still splits the series where ITS
+    // occurrence was, so the candidate must sit on occDate even though the
+    // patch carries the row's current dates.
+    const moved = { ...override, start_date: "2026-09-19", end_date: "2026-09-19" };
+    const movedPatch = { ...patch, start_date: "2026-09-19", end_date: "2026-09-19" };
+    const c = seriesConflictCandidate({
+      scope: "following", wholeSeries: false, ev: moved, primary,
+      patch: movedPatch, occDate: "2026-09-17",
+    });
+    expect(c).toMatchObject({ start_date: "2026-09-17", end_date: "2026-09-17" });
+  });
+
+  it("treats a split at the first occurrence as the series it really is", () => {
+    // wholeSeries routes that case to the same write "all" makes, so it must
+    // be checked the same way too — against the occurrence, not a tail that
+    // never gets created.
+    expect(call("following", override, true).attendee_ids).toBe('["bob"]');
+  });
+
+  it("leaves a virtual occurrence's candidate identical either way", () => {
+    // A virtual occurrence IS the primary's columns, so the distinction only
+    // has teeth for a stored override — which is exactly why it went unnoticed.
+    const virt = { ...primary, _virtual: true, _primaryId: "p1", _occDate: "2026-09-17",
+                   start_date: "2026-09-17", end_date: "2026-09-17" };
+    expect(seriesConflictCandidate({ scope: "following", wholeSeries: false, ev: virt, primary, patch, occDate: "2026-09-17" }).attendee_ids)
+      .toBe(seriesConflictCandidate({ scope: "this", wholeSeries: false, ev: virt, primary, patch, occDate: "2026-09-17" }).attendee_ids);
+  });
+});
+
+// The guards these builders emit are the thing five review rounds kept finding
+// missing at one call site or another. Asserted here, on the statement itself,
+// because that is the level the defect actually lives at: every one of those
+// bugs was a correct guard that some caller simply did not spell.
+describe("event write statements", () => {
+  const primary = { id: "series-1", updated_at: "v1", visibility: "household" };
+  const values = Object.fromEntries(
+    ["title", "description", "location", "start_date", "start_time",
+     "end_date", "end_time", "all_day", "color", "organizer_id", "attendee_ids"]
+      .map(c => [c, `${c}-value`]),
+  );
+
+  describe("updateEvent", () => {
+    it("guards on the row being live, local and at the version supplied", () => {
+      const { sql } = updateEvent({ id: "e1", version: "v1", now: "n", set: { start_time: "09:00" } });
+      expect(sql).toContain("WHERE id=? AND source='local' AND is_cancelled=0 AND updated_at=?");
+    });
+
+    it("binds the CALLER'S version, not the new timestamp", () => {
+      // The distinction the stale-form bug turned on: a write guarded with the
+      // value it is about to install guards against nothing.
+      const { params } = updateEvent({ id: "e1", version: "v-old", now: "n-new", set: { start_time: "09:00" } });
+      expect(params).toEqual(["09:00", "n-new", "e1", "v-old"]);
+    });
+
+    it("always writes updated_at, so the next writer's guard can see this one", () => {
+      const { sql } = updateEvent({ id: "e1", version: "v1", now: "n", set: {} });
+      expect(sql).toContain("SET updated_at=?");
+    });
+
+    it("keeps assignments and parameters in step for a multi-column set", () => {
+      const { sql, params } = updateEvent({
+        id: "e1", version: "v1", now: "n",
+        set: { start_time: "09:00", end_time: "10:00", start_date: "2026-09-20", end_date: "2026-09-20" },
+      });
+      expect(sql).toContain("SET start_time=?,end_time=?,start_date=?,end_date=?,updated_at=?");
+      expect(params).toEqual(["09:00", "10:00", "2026-09-20", "2026-09-20", "n", "e1", "v1"]);
+    });
+
+    it("has one placeholder per bound parameter whatever the set", () => {
+      for (const set of [{}, { recurrence: "{}" }, { is_cancelled: 1 }, values]) {
+        const { sql, params } = updateEvent({ id: "e1", version: "v1", now: "n", set });
+        expect(sql.split("?").length - 1).toBe(params.length);
+      }
+    });
+  });
+
+  describe("claimSeries", () => {
+    it("changes nothing but the version", () => {
+      const { sql } = claimSeries(primary, "n");
+      expect(sql).toContain("SET updated_at=?");
+      expect(sql).not.toMatch(/SET \w+=\?,updated_at/);
+    });
+
+    it("contends on the series' own version, which is what serializes overrides", () => {
+      expect(claimSeries(primary, "n").params).toEqual(["n", "series-1", "v1"]);
+    });
+
+    it("takes an explicit version, for a caller whose snapshot is older than the row it holds", () => {
+      // The edit form's case. It captures the series version when it OPENS and
+      // must claim THAT, because the `primary` it looks up at submit time may
+      // have been refreshed underneath it — loadLocalEvents() runs after every
+      // drag commit — and claiming a version it never showed the member would
+      // overwrite whatever moved it.
+      expect(claimSeries(primary, "n", "v-at-open").params).toEqual(["n", "series-1", "v-at-open"]);
+    });
+  });
+
+  describe("insertOverride", () => {
+    it("inherits visibility from the series rather than defaulting it", () => {
+      // The column defaults to 'everyone' and the row policy reads it, so an
+      // override of a private series that omits it publishes that date.
+      const { sql, params } = insertOverride({ id: "x", primary, occDate: "2026-09-20", actor: "me", now: "n", values });
+      expect(sql).toContain("visibility");
+      expect(params).toContain("household");
+    });
+
+    it("cannot be built without pointing at its parent and date", () => {
+      const { sql, params } = insertOverride({ id: "x", primary, occDate: "2026-09-20", actor: "me", now: "n", values });
+      expect(sql).toContain("recurring_event_id,original_date");
+      expect(params).toContain("series-1");
+      expect(params).toContain("2026-09-20");
+    });
+
+    it("marks a cancellation without disturbing the other columns", () => {
+      const plain = insertOverride({ id: "x", primary, occDate: "d", actor: "me", now: "n", values });
+      const cancelled = insertOverride({ id: "x", primary, occDate: "d", actor: "me", now: "n", values, cancelled: true });
+      expect(plain.sql).not.toContain("is_cancelled");
+      expect(cancelled.sql).toContain("is_cancelled");
+      expect(cancelled.params.length).toBe(plain.params.length + 1);
+    });
+
+    it("has one placeholder per bound parameter", () => {
+      for (const cancelled of [false, true]) {
+        const { sql, params } = insertOverride({ id: "x", primary, occDate: "d", actor: "me", now: "n", values, cancelled });
+        expect(sql.split("?").length - 1).toBe(params.length);
+      }
+    });
+  });
+
+  describe("insertSeries", () => {
+    it("inherits visibility, so a split of a private series stays private", () => {
+      const { params } = insertSeries({ id: "y", primary, actor: "me", now: "n", values: { ...values, recurrence: "{}" } });
+      expect(params).toContain("household");
+    });
+
+    it("has one placeholder per bound parameter", () => {
+      const { sql, params } = insertSeries({ id: "y", primary, actor: "me", now: "n", values: { ...values, recurrence: "{}" } });
+      expect(sql.split("?").length - 1).toBe(params.length);
+    });
+  });
+});
+
+describe("editTargetFor", () => {
+  const primary = { id: "s1", title: "Series", start_date: "2026-09-01", end_date: "2026-09-01", updated_at: "v1" };
+  const override = { id: "x1", title: "Just this one", start_date: "2026-09-20", updated_at: "v9", recurring_event_id: "s1", original_date: "2026-09-20" };
+
+  it("opens the stored override when one exists for this date", () => {
+    // The regression: the member's own title and time for that date were
+    // replaced by the series' the moment they edited the occurrence twice.
+    expect(editTargetFor({ primary, override, scope: "this", occDate: "2026-09-20" })).toBe(override);
+  });
+
+  it("opens the series itself for 'all'", () => {
+    expect(editTargetFor({ primary, override, scope: "all", occDate: "2026-09-20" })).toBe(primary);
+  });
+
+  it("ignores an override for a scope that is not editing that one date", () => {
+    expect(editTargetFor({ primary, override, scope: "following", occDate: "2026-09-20" }).id).toBe("s1");
+  });
+
+  it("falls back to the series on the clicked date when there is no override", () => {
+    const t = editTargetFor({ primary, override: null, scope: "this", occDate: "2026-09-20" });
+    expect(t.title).toBe("Series");
+    expect(t.start_date).toBe("2026-09-20");
+    expect(t.end_date).toBe("2026-09-20");
+  });
+});
+
+describe("dropIsStale", () => {
+  const drop = { primary: { updated_at: "p1" }, ev: { updated_at: "e1" } };
+
+  it("lets a drop through when nothing moved while the picker was open", () => {
+    expect(dropIsStale(drop, { updated_at: "p1" }, { updated_at: "e1" })).toBe(false);
+  });
+
+  it("stops a drop whose series changed", () => {
+    // The patch was computed from times that are no longer there; a refreshed
+    // version would certify it anyway.
+    expect(dropIsStale(drop, { updated_at: "p2" }, { updated_at: "e1" })).toBe(true);
+  });
+
+  it("stops a drop whose occurrence changed", () => {
+    expect(dropIsStale(drop, { updated_at: "p1" }, { updated_at: "e2" })).toBe(true);
+  });
+
+  it("stops a drop whose rows have gone", () => {
+    expect(dropIsStale(drop, undefined, undefined)).toBe(true);
   });
 });

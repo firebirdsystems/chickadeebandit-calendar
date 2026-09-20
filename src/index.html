@@ -473,6 +473,9 @@ import {
   eventSpanMins, applyMove, applyResize, isDraggableEvent,
   applyMoveAcrossDays, pickColumnDate, autoScrollVelocity,
   isNoopDragPatch, dragChangesDate,
+  isSeriesOccurrence, isSeriesException, dragMayChangeDay, splitRecurrence,
+  seriesConflictCandidate,
+  updateEvent, claimSeries, insertOverride, insertSeries, editTargetFor, dropIsStale,
   createPendingDrags,
 } from "./logic.js";
 
@@ -504,8 +507,10 @@ const EVENTS = window.__EVENTS_URL ?? "";
 // provider feed would re-emit hundreds of rows on every poll, and an edit or a
 // cancellation is not a new commitment.
 //
-// Title and date only. Every calendar row is visibility 'everyone', so the title
-// is already household-wide, but the description and location are the parts
+// Title and date only. This fires on the create FORM's path, which writes the
+// column's 'everyone' default, so the title is already household-wide — unlike
+// a row seeded, imported, or inherited from a non-'everyone' series, none of
+// which reach here. The description and location are the parts
 // people put addresses and private notes in and they do not belong in every
 // rule's payload.
 async function publishEvent(type, subjectId, payload = {}) {
@@ -530,6 +535,16 @@ let viewMode     = "week";
 let searchQ = "";       // in-app search (see logic.js searchableFields)
 let pivot        = new Date();
 let modalEl      = null;
+/**
+ * Run once when the current modal goes away, however it goes away.
+ *
+ * The scope picker a recurring drop opens is the first modal with something to
+ * UNDO on dismissal: the event is sitting where the preview left it, and the ✕,
+ * the Cancel button and a backdrop click all reach closeModal() by different
+ * routes. Hanging the cleanup on the one function they share is what makes
+ * "dismissed" a single case instead of three.
+ */
+let onModalClose = null;
 let panelEl      = null;
 /**
  * Drag writes that have not settled yet. See createPendingDrags in logic.js
@@ -554,8 +569,23 @@ async function db(sql, params = []) {
   // (403 row policy, 400 bad statement, 507 over quota). fetch() does not
   // reject on those, so without this throw every caller's rollback and
   // error toast below is unreachable code.
-  if (!res.ok || json.error) throw new Error(json.error || `Database request failed (${res.status})`);
+  if (!res.ok || json.error) throw dbError(res, json);
   return json;
+}
+/**
+ * The hub's refusal, with its STATUS kept.
+ *
+ * `db()` used to throw the server's message alone, which flattens outcomes a
+ * caller has to tell apart: a 409 is a guard declining to act on rows that
+ * moved under it — a refusal, expected, and the caller's business — while
+ * anything else is a failure. The message is no help for that (the 409's is
+ * "Stale state claim", which no member should ever read), so the status rides
+ * along.
+ */
+function dbError(res, json) {
+  const err = new Error(json.error || `Database request failed (${res.status})`);
+  err.status = res.status;
+  return err;
 }
 /**
  * Several statements as one transaction — all apply, or none does.
@@ -570,7 +600,7 @@ async function dbBatch(statements) {
   if (!DB || statements.length === 0) return { results: [] };
   const res = await fetch(DB, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ statements }) });
   const json = await res.json();
-  if (!res.ok || json.error) throw new Error(json.error || `Database request failed (${res.status})`);
+  if (!res.ok || json.error) throw dbError(res, json);
   return json;
 }
 async function initDb() {
@@ -901,14 +931,21 @@ function renderTimeGrid(dates) {
       // leaves nothing to grab for a move, so a short event is move-only and
       // resizing it means opening the form.
       const drag = isDraggableEvent(ev, { canWrite });
+      // One registration serving the click AND the drag. The drag needs the
+      // EXPANDED occurrence, not a row id: every virtual occurrence of a
+      // series carries the primary's id, so `data-drag-id` named the series
+      // rather than the box, and a lookup by it returned the primary — whose
+      // start_date is the series anchor, a different day from the one being
+      // dragged.
+      const key = _regEv(ev, ds);
       const handles = drag && height > 34
         ? `<div class="tg-ev-handle tg-ev-handle-top" data-testid="tg-resize-start" data-drag-edge="start"></div>
            <div class="tg-ev-handle tg-ev-handle-bot" data-testid="tg-resize-end" data-drag-edge="end"></div>`
         : "";
       return `<div class="tg-ev${drag ? " draggable" : ""}" style="top:${top}px;height:${height}px;background:${esc(ev.color)};width:${w};left:${l}"
         data-testid="timegrid-event" data-event-id="${esc(ev.id)}" data-date="${ds}"
-        ${drag ? `data-drag-id="${esc(ev.id)}"` : ""}
-        onclick="_showEvByKey(${_regEv(ev,ds)})"
+        ${drag ? `data-drag-key="${key}"` : ""}
+        onclick="_showEvByKey(${key})"
         title="${esc(ev.title)}">
         ${handles}
         <div class="tg-ev-title">${esc(ev.title)}</div>
@@ -956,9 +993,10 @@ function renderTimeGrid(dates) {
 
 // ─── Time-grid drag & resize ──────────────────────────────────────────────
 // A drag moves an event in time and, in week view, across days; the resize
-// handles change its duration on its own day. The all-day row and recurring
-// occurrences are still out (see isDraggableEvent for what each one would
-// need beyond this code).
+// handles change its duration on its own day. A recurring occurrence is
+// draggable in TIME only, and its drop asks which occurrences it applies to —
+// see dragMayChangeDay for why the day is not on offer there. The all-day row
+// is still out (see isDraggableEvent for what it would need beyond this code).
 //
 // Everything that decides what gets WRITTEN lives in logic.js and is unit
 // tested. This file measures the DOM, feeds it those functions, and draws
@@ -993,6 +1031,68 @@ function swallowNextClick() {
   setTimeout(() => window.removeEventListener("click", swallow, true), 0);
 }
 
+/**
+ * The live rows behind a rendered box, or null if it can no longer be dragged.
+ *
+ * `_evReg` holds the occurrence exactly as it was drawn, and for a virtual
+ * occurrence that snapshot is the ONLY place its date exists — the expansion
+ * generates it from the rule and no row carries it. Everything else is re-read
+ * from localEvents rather than trusted from the snapshot, for the reason the
+ * id lookup here used to give: a reload between render and grab could have
+ * turned this into something unmovable, and the times a drag computes from
+ * have to be the ones its write will be guarded against.
+ *
+ * Returns the occurrence to drag (`ev`), the series primary behind it, and the
+ * date of the occurrence — `occDate`, the series' own name for it, which is
+ * the date the rule GENERATED and not necessarily the date the row now shows.
+ * An exception moved to another day keeps its original_date, and that is what
+ * a later write must match on.
+ */
+function resolveDragTarget(box) {
+  const entry = _evReg[Number(box.dataset.dragKey)];
+  if (!entry) return null;
+  const occ = entry.ev;
+  const primaryId = occ._primaryId ?? occ.id;
+  const primary = localEvents.find(e => e.id === primaryId);
+  if (!primary) return null;
+
+  // Standalone: the row IS the event, exactly as it was before series drags.
+  if (!occ._primaryId) {
+    return { ev: primary, primary, primaryId, occDate: null, series: false };
+  }
+  // The series was dissolved under this box — its rule is gone, so the
+  // occurrence being reached for no longer exists and the primary is now a
+  // plain event on whatever day the anchor names. Refuse rather than guess
+  // which of those two things the member meant to grab.
+  if (!primary.recurrence) return null;
+
+  const occDate = occ._occDate;
+  const ev = liveOccurrence(primary, occ, occDate);
+  return ev && { ev, primary, primaryId, occDate, series: true };
+}
+
+/**
+ * One occurrence of `primary`, rebuilt from the rows as they are right now.
+ *
+ * `snapshot` supplies only what no row can: the occurrence's DATES, which the
+ * expansion generates from the rule and stores nowhere, and — for an exception
+ * — which row to read. Times, title and attendees all come from the live rows,
+ * because a snapshot taken when a finger went down may be minutes old by the
+ * time anything is written from it.
+ */
+function liveOccurrence(primary, snapshot, occDate) {
+  if (snapshot._virtual) {
+    return {
+      ...primary,
+      start_date: snapshot.start_date, end_date: snapshot.end_date,
+      _virtual: true, _primaryId: primary.id, _occDate: occDate,
+    };
+  }
+  // A stored exception standing in for this date: its own row is the truth.
+  const row = localEvents.find(e => e.id === snapshot.id);
+  return row ? { ...row, _primaryId: primary.id, _occDate: occDate } : null;
+}
+
 function onDragPointerDown(e) {
   if (e.button > 0) return;              // right / middle click is not a drag
   if (dragState) {
@@ -1004,13 +1104,17 @@ function onDragPointerDown(e) {
     abandonDrag();
     return;
   }
-  const box = e.target.closest?.(".tg-ev[data-drag-id]");
+  const box = e.target.closest?.(".tg-ev[data-drag-key]");
   if (!box) return;
-  const ev = localEvents.find(x => x.id === box.dataset.dragId);
-  // Re-checked against the row rather than trusted from the markup: a reload
-  // between render and grab could have turned this into something unmovable.
-  if (!ev || !isDraggableEvent(ev, { canWrite })) return;
-  if (pendingDrags.has(ev.id)) return;   // its last drag has not settled yet
+  const target = resolveDragTarget(box);
+  if (!target) return;
+  const { ev, primary, primaryId, occDate, series } = target;
+  if (!isDraggableEvent(ev, { canWrite })) return;
+  // Keyed on the SERIES, not on the row under the finger. All three scopes a
+  // recurring drop offers reach the primary or its exceptions, so two
+  // occurrences of one series must not be in flight at once — and this is the
+  // same key submitEdit and confirmDelete already settle on.
+  if (pendingDrags.has(primaryId)) return;   // its last drag has not settled yet
 
   const edge = e.target.closest(".tg-ev-handle")?.dataset.dragEdge ?? null;
   const scrollEl = e.currentTarget;
@@ -1020,6 +1124,10 @@ function onDragPointerDown(e) {
   const colRect = colEl?.getBoundingClientRect();
   dragState = {
     box, ev, edge,
+    // The series this occurrence belongs to, and which occurrence it is. Both
+    // null for a standalone event, which is every other line in this file's
+    // definition of "not recurring".
+    primary, primaryId, occDate, series,
     scrollEl,
     pointerId: e.pointerId,
     startY: e.clientY,
@@ -1182,7 +1290,7 @@ function columnLeftFor(columns, date) {
  */
 function updateDragPreview() {
   if (!dragState?.moved || !dragState.box.isConnected) return;
-  const { ev, edge, box, columns, originLeft, lastX } = dragState;
+  const { ev, edge, box, columns, originLeft, lastX, series } = dragState;
   const dy = dragDeltaY();
 
   // A resize holds the event on its own day. Dragging an edge sideways is not
@@ -1190,15 +1298,18 @@ function updateDragPreview() {
   // duration and the date.
   if (edge) {
     dragState.patch = applyResize(ev, edge, dy, HOUR_H);
-    previewDrag(box, dragState.patch, 0, false);
+    previewDrag(box, dragState.patch, 0, { series });
     return;
   }
 
-  const date = pickColumnDate(lastX, columns);
+  // `null` is applyMoveAcrossDays' "same day". A recurring occurrence never
+  // consults the columns at all: see dragMayChangeDay for why the day is not
+  // something this gesture is allowed to decide.
+  const date = dragMayChangeDay(ev) ? pickColumnDate(lastX, columns) : null;
   dragState.patch = applyMoveAcrossDays(ev, dy, HOUR_H, date);
   const crossed = dragState.patch.start_date !== ev.start_date;
   const left = crossed ? columnLeftFor(columns, dragState.patch.start_date) : null;
-  previewDrag(box, dragState.patch, left === null ? 0 : left - originLeft, crossed);
+  previewDrag(box, dragState.patch, left === null ? 0 : left - originLeft, { crossed, series });
 }
 
 /**
@@ -1238,7 +1349,7 @@ function startAutoScroll() {
  * visibly snaps to the quarter hour as it moves and what the member sees while
  * dragging is exactly what gets written.
  */
-function previewDrag(box, patch, dx = 0, crossed = false) {
+function previewDrag(box, patch, dx = 0, { crossed = false, series = false } = {}) {
   const { start, end } = eventSpanMins(patch);
   box.style.top    = `${(start / 60) * HOUR_H}px`;
   box.style.height = `${Math.max(((end - start) / 60) * HOUR_H - 2, 18)}px`;
@@ -1258,12 +1369,18 @@ function previewDrag(box, patch, dx = 0, crossed = false) {
   const time = `${fmtTime(patch.start_time)} – ${fmtTime(patch.end_time)}`;
   // The day only appears once the drag has left its own column: naming the
   // current day on every ordinary vertical drag is noise.
-  label.textContent = crossed ? `${fmtDateShort(patch.start_date)} · ${time}` : time;
+  //
+  // The 🔁 is on for the whole gesture instead of only at the end, because it
+  // is the answer to a question the member is about to be asked on release —
+  // which occurrences this moves. A marker that appeared with the scope picker
+  // would not have warned anyone; it would only have explained the surprise.
+  const dayPart = crossed ? `${fmtDateShort(patch.start_date)} · ` : "";
+  label.textContent = `${series ? "🔁 " : ""}${dayPart}${time}`;
 }
 
 function onDragPointerUp(e) {
   if (!dragState || e.pointerId !== dragState.pointerId) return;
-  const { moved, patch, ev, box, previewDx } = dragState;
+  const { moved, patch, ev, box, previewDx, series, primary, primaryId, occDate } = dragState;
   endDrag();
   // Same reason as the move handler: a drop onto a grid that no longer exists
   // is not a drop the member made against what they were looking at.
@@ -1283,6 +1400,11 @@ function onDragPointerUp(e) {
   // old day. Put the offset back and let the render, which every branch of the
   // commit reaches, be what clears it.
   if (previewDx) box.style.transform = `translateX(${previewDx}px)`;
+  // A recurring occurrence has no single answer to "what did that move?", so
+  // the drop asks before it writes. The box keeps the preview's position for
+  // the life of the picker — which is the point: it shows what is being
+  // decided about.
+  if (series) { openDropScopeModal({ ev, primary, primaryId, occDate, patch }); return; }
   commitDrag(ev, patch);
 }
 
@@ -1432,15 +1554,20 @@ async function runDragCommit(ev, patch, entry) {
       // start_date and end_date are `_date`-suffixed, so the app-DB codec
       // leaves them plaintext — they are safe to write as parameters and, if
       // it ever came to it, to compare in a predicate.
-      const { changed } = movesDay
-        ? await db(
-            `UPDATE app_calendar__events SET start_time=?,end_time=?,start_date=?,end_date=?,updated_at=? WHERE id=? AND source='local' AND is_cancelled=0`,
-            [changes.start_time, changes.end_time, changes.start_date, changes.end_date, now, ev.id],
-          )
-        : await db(
-            `UPDATE app_calendar__events SET start_time=?,end_time=?,updated_at=? WHERE id=? AND source='local' AND is_cancelled=0`,
-            [changes.start_time, changes.end_time, now, ev.id],
-          );
+      // `updated_at` is the version this patch was computed FROM — applyMove()
+      // run against the row's own start_time as it was at pointerdown. An edit
+      // that landed since makes the result arithmetic on a number that is no
+      // longer there, and without this predicate the drag would silently
+      // overwrite it. The zero-change branch below already knows what to do
+      // with a write that did not match.
+      const stmt = updateEvent({
+        id: ev.id, version: ev.updated_at, now,
+        set: movesDay
+          ? { start_time: changes.start_time, end_time: changes.end_time,
+              start_date: changes.start_date, end_date: changes.end_date }
+          : { start_time: changes.start_time, end_time: changes.end_time },
+      });
+      const { changed } = await db(stmt.sql, stmt.params);
       // A row policy refuses a write by NARROWING the UPDATE's predicate, not
       // by erroring: a refusal is HTTP 200 with changed: 0, which db() cannot
       // throw on. Without this the optimistic move stands, looks saved, and
@@ -1468,7 +1595,7 @@ async function runDragCommit(ev, patch, entry) {
           localEvents = localEvents.map(e => e.id === ev.id ? { ...e, ...restore } : e);
         }
         renderPreservingScroll();
-        showDragError(refreshed
+        showWriteError(refreshed
           ? "This event could not be moved. It may have been changed or removed — the calendar has been refreshed."
           : "This event could not be moved, and the calendar could not be refreshed. Reload to see its current state.");
         return;
@@ -1477,7 +1604,7 @@ async function runDragCommit(ev, patch, entry) {
       entry.patch = null;   // failed: never let a reload reapply it
       if (restore) localEvents = localEvents.map(e => e.id === ev.id ? { ...e, ...restore } : e);
       renderPreservingScroll();
-      showDragError(err?.message || "This event could not be moved.");
+      showWriteError(err?.message || "This event could not be moved.");
     }
   } catch (err) {
     // This function must never reject. The drop handler does not await it —
@@ -1487,18 +1614,415 @@ async function runDragCommit(ev, patch, entry) {
     if (entry.patch && restore) localEvents = localEvents.map(e => e.id === ev.id ? { ...e, ...restore } : e);
     entry.patch = null;
     renderPreservingScroll();
-    showDragError(err?.message || "This event could not be moved.");
+    showWriteError(err?.message || "This event could not be moved.");
   }
   // No finally: the entry is retired by commitDrag, which owns it.
 }
 
+
+// ─── Recurring drop: pick a scope, then write ─────────────────────────────
+
+/**
+ * Drops waiting on a scope.
+ *
+ * Same reason as _evReg: the picker's options are inline onclick strings, and
+ * a drop carries a patch and two rows — none of which belongs in one. Unlike
+ * _evReg this is NOT cleared by render(), because the picker outlives every
+ * render underneath it (the modal hangs off document.body, not #root).
+ */
+let _dropReg = [];
+function _regDrop(drop) {
+  // Reuse the array once nothing in it is live, so a long session of recurring
+  // drags does not accumulate a slot per drop.
+  if (_dropReg.every(d => d === null)) _dropReg = [];
+  _dropReg.push(drop);
+  return _dropReg.length - 1;
+}
+
+function openDropScopeModal(drop) {
+  const key = _regDrop(drop);
+  openScopeModal("move", drop.primaryId, drop.occDate, key);
+  // Set AFTER openScopeModal, which opens through openModal — and openModal
+  // begins by closing whatever was there, which would otherwise fire this
+  // cleanup against the drop it was just registered for.
+  onModalClose = () => {
+    _dropReg[key] = null;
+    // Dismissed without choosing. Nothing was written, and the event is still
+    // sitting where the preview left it, so put the grid back.
+    renderPreservingScroll();
+  };
+}
+
+window._dropScope = function(key, scope) {
+  const drop = _dropReg[key];
+  // Taken, not read: a double-click on an option must not run the write twice.
+  _dropReg[key] = null;
+  // This close must NOT run the dismissal cleanup — that re-renders the grid
+  // to undo the preview, and the write below is about to do its own render
+  // from authoritative rows.
+  onModalClose = null;
+  closeModal();
+  if (!drop) return;
+  commitSeriesDrag(drop, scope);
+};
+
+/**
+ * The drop's rows as they are now, or null if the series can no longer take it.
+ *
+ * A primary that has lost its rule is the refusal that matters: the occurrence
+ * the member dragged does not exist any more, and every scope here would write
+ * the rule back on to a row someone has deliberately made a plain event.
+ */
+// The override standing in for one date of a series, if there is one. Written
+// out at five call sites before this, which is how the edit form came to test
+// for one on a row that never carries it.
+function findOverride(primaryId, occDate) {
+  return localEvents.find(e => e.recurring_event_id === primaryId && e.original_date === occDate);
+}
+
+function refreshDrop(drop) {
+  const primary = localEvents.find(e => e.id === drop.primaryId);
+  if (!primary?.recurrence) return null;
+  const ev = liveOccurrence(primary, drop.ev, drop.occDate);
+  if (!ev) return null;
+  // Refusing here is the point, and re-reading is how the change is DETECTED
+  // rather than how it is repaired.
+  //
+  // `patch` is absolute — applyMove() run against the times the row had at
+  // pointerdown — and it is the one thing in `drop` this function does not
+  // refresh, because there is nothing to recompute it from once the finger is
+  // up. So handing the writers a refreshed `updated_at` alongside it would let
+  // the predicate certify a payload that was computed from times that are no
+  // longer there: arithmetic on a number someone has since replaced, admitted
+  // by a version that says nothing changed. The guard would pass and the other
+  // member's edit would be overwritten by a drag that never saw it.
+  //
+  // A version that moved while the picker was open therefore ends the drop.
+  // The member is told the series changed, sees the refreshed calendar, and
+  // can drag again from what is actually there.
+  if (dropIsStale(drop, primary, ev)) return null;
+  return { ...drop, primary, ev };
+}
+
+/**
+ * The statement that CLAIMS a series for a write, at the version it was read at.
+ *
+ * Paired with `requireChanges` it does two jobs at once. It refuses a write
+ * built from a snapshot the series has moved past — a rule someone re-cut, a
+ * time someone changed — and it serializes the writes that have nothing of
+ * their own to contend on: creating an override INSERTs a row, and
+ * `(recurring_event_id, original_date)` carries only a NON-unique index, so
+ * two members can each add one for the same occurrence and the expansion —
+ * which keys exMap by that date — will quietly draw one and drop the other.
+ * Bumping the primary's version makes it the row they contend on instead.
+ *
+ * A UNIQUE index would be the tighter answer, and is deliberately not taken:
+ * the column pair holds live data, so the migration could only be made safe by
+ * DELETING one of two member-authored overrides — and which one is visible
+ * today depends on list order, so there is no "the wrong one" to pick.
+ */
+
+
+/** Run a recurring drop's write under registration, keyed on the series. */
+function commitSeriesDrag(drop, scope) {
+  return pendingDrags.run(drop.primaryId, () => runSeriesDragCommit(drop, scope));
+}
+
+/**
+ * Whether a guarded write actually matched a row.
+ *
+ * `changed` is a number for every real statement; it is absent only where
+ * there is no database at all, and nothing is refused there.
+ */
+const didApply = (res) => res?.changed !== 0;
+
+/**
+ * Run a batch whose FIRST statement is a guard that may legitimately refuse.
+ *
+ * `requireChanges` is what makes a zero-match UPDATE abort the transaction.
+ * Without it a batch is atomic only against errors: a guard statement that
+ * matches nothing succeeds, reports `changed: 0`, and every statement after it
+ * still commits — which is how "the series could not be moved" and "a new
+ * series was created anyway" became the same outcome.
+ *
+ * A refused guard rolls the batch back and comes back as a 409. That is a
+ * refusal, not a failure, and it belongs here as `false` rather than as a
+ * thrown error carrying server copy written for a log.
+ */
+async function guardedBatch(statements) {
+  // requireChanges is applied HERE, to every UPDATE in the batch, rather than
+  // being spelled at each statement. A multi-statement batch in this file is
+  // always a set of writes that only mean anything together — cap a series and
+  // create its tail, claim a parent and insert its override — and a batch is
+  // atomic against ERRORS, not against a statement matching nothing. So an
+  // unflagged UPDATE in one of these is never a deliberate "may match zero";
+  // it is the bug, twice found by review and once by a mutation. Making it the
+  // batch's property rather than the caller's is what stops there being a
+  // third.
+  //
+  // UPDATE only, deliberately. DELETE is the one shape here that IS allowed to
+  // match nothing: "this and following" clears the overrides at or after the
+  // split, and a series that simply has none is the ordinary case, not a lost
+  // race. INSERTs are skipped because requireChanges is UPDATE/DELETE-only and
+  // the hub rejects it on anything else. A statement that says requireChanges
+  // itself keeps what it says.
+  const guarded = statements.map(st =>
+    /^\s*UPDATE\b/i.test(st.sql) && st.requireChanges === undefined
+      ? { ...st, requireChanges: true } : st);
+  try {
+    await dbBatch(guarded);
+    // Nothing to inspect in the results: a guard that matched nothing has
+    // already thrown, so reaching here IS the statement having applied.
+    return true;
+  } catch (err) {
+    if (err?.status === 409) return false;
+    throw err;
+  }
+}
+
+/**
+ * Save a recurring occurrence's new time under the scope the member picked.
+ *
+ * Pessimistic throughout, unlike a standalone drag. Two of the three scopes
+ * are multi-row operations — an exception upsert, a series split — whose
+ * result is not something to guess at; and the member has just spent a modal
+ * deciding, so the instant feedback an optimistic move buys was already gone.
+ * It also leaves the registry entry's `patch` null, which is what stops a
+ * reload landing mid-write from putting a position on screen that nothing has
+ * agreed to.
+ */
+async function runSeriesDragCommit(drop, scope) {
+  try {
+    // Everything in `drop` was captured when the finger went down, and the
+    // scope picker then sat open for as long as the member took to decide.
+    // That is long enough for a form save, another member, or a sync to land,
+    // and the snapshot is fine for drawing a preview but wrong for writing:
+    // `primary.recurrence` is written back verbatim by a split, so a stale
+    // copy would re-add a rule someone has just removed.
+    const fresh = refreshDrop(drop);
+    if (!fresh) {
+      try { await loadLocalEvents(); } catch { /* the message covers it */ }
+      renderPreservingScroll();
+      showWriteError("This event could not be moved. Its series has changed — the calendar has been refreshed.");
+      return;
+    }
+    const { ev, primary, primaryId, occDate, patch } = fresh;
+    // The whole series is excluded, not just the row under the finger:
+    // findMemberConflicts also skips anything whose _primaryId is excluded, so
+    // the primary's id covers every virtual occurrence, and the stored
+    // exceptions are named directly.
+    //
+    // Checked against the dropped DATE only. That is the same reach the edit
+    // form has for the same scopes — a check that spans "all events" would
+    // have to expand the whole series — and it is the date the member is
+    // looking at.
+    const seriesIds = new Set([
+      primaryId,
+      ...localEvents.filter(e => e.recurring_event_id === primaryId).map(e => e.id),
+    ]);
+    // Decided before the conflict check, because WHICH rows a scope writes is
+    // what the check has to be run against. Splitting at the FIRST occurrence
+    // moves every occurrence there is, which is "all events" — and routing it
+    // there avoids leaving the original row behind as a series whose rule now
+    // ends before it starts: invisible in every view, so impossible to delete.
+    const wholeSeries = scope === "all"
+      || (scope === "following" && occDate === primary.start_date);
+    // What the chosen scope will WRITE, which for a split is not the occurrence
+    // under the finger — see seriesConflictCandidate.
+    const candidate = seriesConflictCandidate({ scope, wholeSeries, ev, primary, patch, occDate });
+    const conflicts = findConflictsFor(candidate, seriesIds);
+    if (conflicts.length) {
+      const ok = await hubConfirm("Schedule conflict", {
+        description: describeConflicts(conflicts),
+        confirmLabel: "Move anyway",
+      });
+      if (!ok) { renderPreservingScroll(); return; }
+    }
+
+    const now = new Date().toISOString();
+    const applied = wholeSeries        ? await moveWholeSeries(primary, ev, patch, now)
+                  : scope === "this"   ? await moveOneOccurrence(primary, ev, occDate, patch, now)
+                  :                      await moveFollowing(primary, occDate, patch, now);
+
+    // Nothing optimistic went on screen, so this re-read is not a rollback —
+    // it is the only thing that makes the result visible. It also corrects the
+    // preview, which is still sitting at the dropped position whether the
+    // write applied or not.
+    try { await loadLocalEvents(); } catch { /* reported below either way */ }
+    renderPreservingScroll();
+    if (!applied) {
+      showWriteError("This event could not be moved. It may have been changed or removed — the calendar has been refreshed.");
+    }
+  } catch (err) {
+    // Never rejects, for the reason runDragCommit gives: nothing awaits this,
+    // so a rejection would surface as nothing but an unhandled one.
+    renderPreservingScroll();
+    showWriteError(err?.message || "This event could not be moved.");
+  }
+}
+
+/**
+ * "All events" — the series' own time moves, so every occurrence it generates
+ * moves with it.
+ *
+ * Exception rows OTHER than the dragged one keep the times they were given,
+ * which is the answer the edit form's "all" scope gives too: an override is a
+ * decision about one date, and a series-wide change is not a reason to throw
+ * it away. The dragged one is the exception to that, below.
+ *
+ * Guarded on the same conditions isDraggableEvent checked, for the same reason
+ * the standalone drag is: a row a sync re-sourced or a cancellation retired
+ * since the grid was drawn must not be rewritten by a drag aimed at what it
+ * used to be — plus `updated_at`, which is the version this write was computed
+ * FROM. The patch is applyMove() run against the snapshot's own start_time, so
+ * a time someone else changed in the meantime makes the result arithmetic on a
+ * number that no longer exists. `updated_at` is `_at`-suffixed and therefore
+ * plaintext, which is what lets it be a predicate at all.
+ */
+async function moveWholeSeries(primary, ev, patch, now) {
+  const moveTo = row => updateEvent({
+    id: row.id, version: row.updated_at, now,
+    set: { start_time: patch.start_time, end_time: patch.end_time },
+  });
+  // The occurrence under the finger is written alongside the series when it is
+  // a stored exception. Without this, the one box the member actually dragged
+  // is the one box that does not move — its own times outrank the series' — and
+  // "all events" visibly skips it. Two statements, one transaction: a series
+  // moved without its exception is exactly the half-state this avoids.
+  if (!isSeriesException(ev)) {
+    const stmt = moveTo(primary);
+    return didApply(await db(stmt.sql, stmt.params));
+  }
+  // requireChanges on BOTH, not a check on the results afterwards. Either
+  // guarded UPDATE can match nothing on its own — the series deleted, the
+  // override cancelled — and reading that back after the fact detects a series
+  // moved without its exception without being able to undo it.
+  return guardedBatch([
+    moveTo(primary),
+    moveTo(ev),
+  ]);
+}
+
+/**
+ * "This event" — one date is overridden and the rule is untouched.
+ *
+ * An upsert, because the occurrence may already have an exception row (it was
+ * renamed once before) or may still be purely virtual. The INSERT copies the
+ * PRIMARY's columns rather than the occurrence's: for a virtual occurrence the
+ * two differ only in the dates, and those are passed explicitly.
+ *
+ * `original_date` is the date the RULE generated, which is what pins the
+ * override to the occurrence it replaces — not the date the row shows, which a
+ * later edit may move.
+ */
+async function moveOneOccurrence(primary, ev, occDate, patch, now) {
+  const existing = findOverride(primary.id, occDate);
+  if (existing) {
+    // Claims the parent as well, for the reason the edit form's matching
+    // branch gives: an override only means anything while the series that
+    // generates its date still stands, so a parent dissolved or truncated
+    // while the picker was open would leave this write succeeding against a
+    // row that is no longer drawn anywhere — and an override is only ever
+    // drawn THROUGH its parent.
+    return guardedBatch([
+      claimSeries(primary, now),
+      updateEvent({
+        id: existing.id, version: existing.updated_at, now,
+        set: { start_time: patch.start_time, end_time: patch.end_time },
+      }),
+    ]);
+  }
+  // `visibility` is carried explicitly and is not optional. The column defaults
+  // to 'everyone' and the row policy reads it, so an override created for a
+  // series that is NOT 'everyone' would be published to the whole household by
+  // a gesture that only meant to move it by an hour. The app's own form writes
+  // no other value today, but seeds, automations and imports all can.
+  return guardedBatch([
+    // The INSERT has nothing to guard on — there is no row yet to narrow a
+    // predicate against — so the primary is touched first, under
+    // requireChanges, and does two jobs.
+    //
+    // It asserts the parent is still there. refreshDrop checked the same thing
+    // against the LOCAL rows, which is a snapshot; a delete landing between
+    // that check and this write would leave an override whose parent is gone,
+    // and an override is only ever drawn THROUGH its parent — so the row would
+    // be invisible in every view and impossible to remove.
+    //
+    // And it SERIALIZES override creation. `original_date` carries only a
+    // non-unique index, so nothing in the schema stops two members creating an
+    // override for the same occurrence at once — and the expansion keys exMap
+    // by that date, so the loser is not a visible duplicate but a row that
+    // silently disappears. Matching `updated_at` and then bumping it makes the
+    // primary the row they contend on: the first batch moves the version, the
+    // second no longer matches it and rolls back.
+    //
+    // The bump is not a side effect to apologize for: the series did just
+    // change, by acquiring an override.
+    claimSeries(primary, now),
+    insertOverride({
+      id: crypto.randomUUID(), primary, occDate, actor: ME?.id ?? null, now,
+      values: { ...primary, start_date: ev.start_date, end_date: ev.end_date,
+                start_time: patch.start_time, end_time: patch.end_time },
+    }),
+  ]);
+}
+
+/**
+ * "This and following" — the series is split in two at this date.
+ *
+ * One transaction, because the halves only mean anything together: capping
+ * without creating silently truncates the series, and creating without capping
+ * leaves two series overlapping on the same dates, each showing the other's
+ * occurrences.
+ *
+ * Exception rows on or after the split are NOT re-pointed at the new series.
+ * They keep `recurring_event_id` on the original primary, whose rule no longer
+ * reaches their dates, so the expansion stops drawing them — the same thing
+ * the edit form's "following" scope does, and the same thing that makes a
+ * split reversible only by editing, not by splitting back.
+ */
+async function moveFollowing(primary, occDate, patch, now) {
+  const rule = JSON.parse(primary.recurrence ?? "{}");
+  // How many occurrences fall before the split. Only the expansion can answer
+  // that, and splitRecurrence needs it to divide a COUNTED rule between the
+  // two halves instead of handing each of them the original total.
+  const preceding = occurrencesInRange(
+    primary.start_date, rule, primary.start_date, addDayStr(occDate, -1),
+  ).length;
+  const { head, tail } = splitRecurrence(rule, occDate, preceding);
+  return guardedBatch([
+    // requireChanges, because atomic is not the same as all-or-nothing here: a
+    // cap that matches no rows — the series deleted, cancelled, or re-sourced
+    // since the grid was drawn — is not an error, so without this the INSERT
+    // below still commits and the member is told the move failed while a brand
+    // new series quietly appears beside the one they were looking at.
+    updateEvent({ id: primary.id, version: primary.updated_at, now,
+      set: { recurrence: JSON.stringify(head) } }),
+    // Same reason as the override INSERT: the tail of a series that is not
+    // 'everyone' must not become 'everyone' because someone dragged it.
+    insertSeries({
+      id: crypto.randomUUID(), primary, actor: ME?.id ?? null, now,
+      values: { ...primary, start_date: occDate, end_date: occDate,
+                start_time: patch.start_time, end_time: patch.end_time,
+                recurrence: JSON.stringify(tail) },
+    }),
+  ]);
+}
+
 let dragErrorTimer = null;
-function showDragError(message) {
-  document.getElementById("drag-error")?.remove();
+/**
+ * The app's one "that write did not happen" surface.
+ *
+ * Named for drags when only drags could be refused; the form's recurring
+ * scopes now claim a series the same way and can be told no the same way, so
+ * the name and the testid follow the meaning rather than the first caller.
+ */
+function showWriteError(message) {
+  document.getElementById("write-error")?.remove();
   const box = document.createElement("div");
-  box.id = "drag-error";
+  box.id = "write-error";
   box.className = "tg-drag-error";
-  box.dataset.testid = "drag-error";
+  box.dataset.testid = "write-error";
   box.setAttribute("role", "status");
   box.textContent = message;
   document.body.appendChild(box);
@@ -1623,7 +2147,7 @@ function closePanels() { panelEl?.remove(); panelEl = null; }
 function showEvent(evId, dateStr, primaryId, occDate) {
   closePanels(); closeModal();
   const primary = localEvents.find(e => e.id === primaryId) ?? syncedEvents.find(e => e.id === evId);
-  const exception = localEvents.find(e => e.recurring_event_id === primaryId && e.original_date === occDate);
+  const exception = findOverride(primaryId, occDate);
   const ev = exception ?? localEvents.find(e => e.id === evId) ?? primary;
   if (!ev) return;
   const _evDetailKey = _regEv(ev, dateStr);
@@ -1883,15 +2407,42 @@ async function openEditModal(primaryId, occDate) {
 }
 function openDirectEdit(ev, scope, occDate) {
   const primary = localEvents.find(e => e.id === (ev._primaryId ?? ev.id)) ?? ev;
-  const editTarget = (scope === "this" && ev.recurring_event_id) ? ev : (scope !== "all" ? { ...primary, start_date: occDate, end_date: occDate } : primary);
+  // "This event" on a date that ALREADY has an override opens that override,
+  // by looking it up rather than by testing `ev` for one. Every caller reaches
+  // here holding the primary — the scope picker re-finds it by id — so a test
+  // like `ev.recurring_event_id` can never be true, and the form silently
+  // opened on parent-derived values instead. Saving then wrote those over the
+  // override, because the save path DOES find the stored row: the member's
+  // custom title, time and attendees for that date were replaced by the
+  // series' every time they edited the occurrence twice.
+  const override = findOverride(primary.id, occDate);
+  const editTarget = editTargetFor({ primary, override, scope, occDate });
   openModal(`<div class="modal-header"><h3>Edit Event</h3><button class="btn btn-ghost btn-sm" data-testid="modal-close" onclick="closeModal()">✕</button></div>
     ${buildEventForm(editTarget)}
     <div class="modal-actions">
       <button class="btn btn-ghost" data-testid="modal-cancel" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary" data-testid="event-edit-submit" onclick="submitEdit('${primary.id}','${scope}','${occDate}')">Save</button>
+      <button class="btn btn-primary" data-testid="event-edit-submit" onclick="submitEdit('${primary.id}','${scope}','${occDate}','${primary.updated_at ?? ""}','${override?.updated_at ?? ""}')">Save</button>
     </div>`, "event-edit-modal");
 }
-window.submitEdit = async function(primaryId, scope, occDate) {
+// Two versions, both read when the form OPENED and neither re-read here.
+//
+// They are passed separately rather than pre-resolved into "the one to use"
+// because the scope is not always known at capture time — the delete picker
+// chooses AFTER its versions are taken — so each branch names the row it is
+// actually writing: `parentVersion` for a write to the series, and
+// `overrideVersion` for a write to this date's exception row.
+//
+// They are captured at open because that is the moment the form's contents
+// became a statement about the data. Re-reading either at submit defeats the
+// guard completely: it returns whatever overwrote the row and then passes a
+// predicate against it. That is not hypothetical here — `loadLocalEvents()`
+// runs after every drag commit, and openEditModal only waits on a drag of its
+// OWN primary, so a drag settling on any other event refreshes this array
+// underneath an open form.
+//
+// Empty when the row had no version yet; the guards treat that as "cannot
+// claim" rather than as a wildcard.
+window.submitEdit = async function(primaryId, scope, occDate, parentVersion, overrideVersion) {
   // openEditModal already waited once, but the form stays open across further
   // interaction. Gating the write itself is what actually holds the invariant:
   // no mutation of an event proceeds while a drag on it is unresolved.
@@ -1910,8 +2461,22 @@ window.submitEdit = async function(primaryId, scope, occDate) {
     closeModal();
     render();
     try {
-      await db(`UPDATE app_calendar__events SET title=?,description=?,location=?,start_date=?,start_time=?,end_date=?,end_time=?,all_day=?,color=?,attendee_ids=?,recurrence=?,updated_at=? WHERE id=?`,
-        [data.title,data.description,data.location,data.start_date,data.start_time,data.end_date,data.end_time,data.all_day,data.color,data.attendee_ids,data.recurrence,now,primaryId]);
+      // Version-guarded for the same reason the standalone drag is, and with
+      // the same consequence if it is not: this statement writes whole times
+      // and dates, so an unguarded save replays the form's snapshot over
+      // anything that moved the row since it opened.
+      const stmt = updateEvent({ id: primaryId, version: parentVersion, now,
+        set: { title: data.title, description: data.description, location: data.location,
+               start_date: data.start_date, start_time: data.start_time,
+               end_date: data.end_date, end_time: data.end_time,
+               all_day: data.all_day, color: data.color, attendee_ids: data.attendee_ids, recurrence: data.recurrence } });
+      const { changed } = await db(stmt.sql, stmt.params);
+      if (changed === 0) {
+        // Refused, not failed: the row is fine, this form's idea of it is not.
+        localEvents = withPendingDrags(prevEvents);
+        render();
+        showWriteError("This event changed somewhere else while you had it open. Your edit was not saved \u2014 reopen it to see the current version.");
+      }
     } catch {
       // Restored THROUGH the pending-drag registry. Before drags existed every
       // mutation went through this modal and could not overlap another, so a
@@ -1925,34 +2490,64 @@ window.submitEdit = async function(primaryId, scope, occDate) {
     return;
   }
 
-  // Recurrence scopes — pessimistic (multi-step operations)
+  // Recurrence scopes — pessimistic (multi-step operations). Every branch
+  // claims the series at the version this form was built from; see claimSeries.
+  let applied = true;
   const btn = modalEl?.querySelector('.modal-actions .btn-primary');
   if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
   if (scope === "this") {
-    const existing = localEvents.find(e => e.recurring_event_id === primaryId && e.original_date === occDate);
+    const existing = findOverride(primaryId, occDate);
     const durDays = daysBetween(primary.start_date, primary.end_date);
     const endDate = data.end_date !== occDate ? data.end_date : addDayStr(data.start_date, durDays);
     if (existing) {
-      await db(`UPDATE app_calendar__events SET title=?,description=?,location=?,start_date=?,start_time=?,end_date=?,end_time=?,all_day=?,color=?,attendee_ids=?,updated_at=? WHERE id=?`,
-        [data.title,data.description,data.location,data.start_date,data.start_time,endDate,data.end_time,data.all_day,data.color,data.attendee_ids,now,existing.id]);
+      // Claimed against the PARENT as well as itself. Guarding only the
+      // override asks "is this row still as I found it", which stays true
+      // after someone dissolves or re-splits the series out from under it —
+      // and an override whose parent no longer generates that date is drawn
+      // nowhere, so the save would report success for an edit no one can see.
+      // The series is the thing being contended on, so it is the thing to
+      // claim; requireChanges on both makes either one losing roll back both.
+      applied = await guardedBatch([
+        claimSeries(primary, now, parentVersion),
+        updateEvent({ id: existing.id, version: overrideVersion, now,
+          set: { title: data.title, description: data.description, location: data.location,
+               start_date: data.start_date, start_time: data.start_time,
+               end_date: endDate, end_time: data.end_time,
+               all_day: data.all_day, color: data.color, attendee_ids: data.attendee_ids } }),
+      ]);
     } else {
       const exId = crypto.randomUUID();
-      await db(`INSERT INTO app_calendar__events (id,title,description,location,start_date,start_time,end_date,end_time,all_day,color,organizer_id,attendee_ids,recurring_event_id,original_date,source,created_by,created_at,updated_at)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,'local',?,?,?)`,
-        [exId,data.title,data.description,data.location,data.start_date,data.start_time,endDate,data.end_time,data.all_day,data.color,ME?.id??null,data.attendee_ids,primaryId,occDate,ME?.id??null,now,now]);
+      // visibility is carried from the series for the reason the drag paths
+      // give: the column defaults to 'everyone' and the row policy reads it,
+      // so an override of a non-'everyone' series would publish that date.
+      applied = await guardedBatch([
+        claimSeries(primary, now, parentVersion),
+        insertOverride({ id: exId, primary, occDate, actor: ME?.id ?? null, now,
+          values: { ...data, end_date: endDate, organizer_id: ME?.id ?? null } }),
+      ]);
     }
   } else if (scope === "following") {
     const rule = JSON.parse(primary.recurrence ?? "{}");
-    rule.end_date = addDayStr(occDate, -1);
+    // end_type as well as end_date, for the reason splitRecurrence gives: the
+    // renderer honours end_date, but this form builds its rule from end_type,
+    // so a head left saying "never" loses its cap the next time anyone opens
+    // and saves it. deleteEvent's split has always set both.
+    rule.end_date = addDayStr(occDate, -1); rule.end_type = "date";
     const newId = crypto.randomUUID();
-    await dbBatch([
-      { sql: `UPDATE app_calendar__events SET recurrence=?,updated_at=? WHERE id=?`, params: [JSON.stringify(rule),now,primaryId] },
-      { sql: `INSERT INTO app_calendar__events (id,title,description,location,start_date,start_time,end_date,end_time,all_day,color,organizer_id,attendee_ids,recurrence,source,created_by,created_at,updated_at)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'local',?,?,?)`,
-        params: [newId,data.title,data.description,data.location,occDate,data.start_time,occDate,data.end_time,data.all_day,data.color,ME?.id??null,data.attendee_ids,data.recurrence,ME?.id??null,now,now] },
+    // requireChanges on the cap, for the reason moveFollowing gives: a batch
+    // is atomic against ERRORS, and a cap matching no rows is not an error —
+    // so without it the new series is created beside a series that was never
+    // capped, and the two generate over the top of each other.
+    applied = await guardedBatch([
+      updateEvent({ id: primaryId, version: parentVersion, now,
+        set: { recurrence: JSON.stringify(rule) } }),
+      insertSeries({ id: newId, primary, actor: ME?.id ?? null, now,
+        values: { ...data, start_date: occDate, end_date: occDate,
+                  organizer_id: ME?.id ?? null, recurrence: data.recurrence } }),
     ]);
   }
   await loadLocalEvents(); closeModal(); render();
+  if (!applied) showWriteError("This event could not be saved. It may have been changed or removed — the calendar has been refreshed.");
 };
 
 // ─── Delete ───────────────────────────────────────────────────────────────
@@ -1960,7 +2555,12 @@ async function confirmDelete(primaryId, occDate, isRecurring) {
   // Same reason as openEditModal: never race a pending drag on this row.
   await settlePendingDrag(primaryId);
   if (isRecurring) openScopeModal("delete", primaryId, occDate);
-  else if (await hubConfirm({ message: "Delete this event?", confirmLabel: "Delete", destructive: true })) deleteEvent(primaryId, occDate, "all");
+  else if (await hubConfirm({ message: "Delete this event?", confirmLabel: "Delete", destructive: true })) {
+    // Read after the confirm resolves but before the await in deleteEvent, so
+    // it is the version the member was looking at when they said yes.
+    const ev = localEvents.find(e => e.id === primaryId);
+    deleteEvent(primaryId, occDate, "all", ev?.updated_at ?? "");
+  }
 }
 async function hideEvent(id) {
   const prev = [...syncedEvents];
@@ -1975,7 +2575,7 @@ async function hideEvent(id) {
     render();
   }
 }
-async function deleteEvent(primaryId, occDate, scope) {
+async function deleteEvent(primaryId, occDate, scope, parentVersion, overrideVersion) {
   await settlePendingDrag(primaryId);   // same invariant as submitEdit
   const now = new Date().toISOString();
   const primary = localEvents.find(e => e.id === primaryId);
@@ -1986,39 +2586,97 @@ async function deleteEvent(primaryId, occDate, scope) {
     localEvents = localEvents.filter(e => e.id !== primaryId && e.recurring_event_id !== primaryId);
     closeModal();
     render();
-    try {
-      await db(`DELETE FROM app_calendar__events WHERE id=? OR recurring_event_id=?`, [primaryId, primaryId]);
-    } catch {
+    // Two statements, because one `id=? OR recurring_event_id=?` cannot carry
+    // a version: the predicate would have to match the primary's `updated_at`
+    // against the overrides too, and they keep their own. So the series is
+    // deleted under its version and its overrides follow unconditionally.
+    //
+    // requireChanges is spelled here rather than left to guardedBatch, which
+    // flags UPDATEs only — a DELETE is normally allowed to match nothing, and
+    // the second statement below relies on that (a series with no overrides is
+    // the ordinary case). This one is the exception: no primary matched means
+    // the version moved, and the overrides must not be deleted anyway.
+    const applied = await guardedBatch([
+      { sql: `DELETE FROM app_calendar__events WHERE id=? AND updated_at=?`,
+        params: [primaryId, parentVersion], requireChanges: true },
+      { sql: `DELETE FROM app_calendar__events WHERE recurring_event_id=?`, params: [primaryId] },
+    ]).catch(() => null);
+    if (applied === null) {
       localEvents = withPendingDrags(prevEvents);   // same reason as submitEdit
       render();
+    } else if (!applied) {
+      await loadLocalEvents();
+      render();
+      showWriteError("This event changed somewhere else while you had it open. It was not deleted \u2014 the calendar has been refreshed.");
     }
     return;
   }
 
+  // Claimed at the version this delete was decided from, like every other
+  // recurrence write; see claimSeries.
+  let applied = true;
   if (scope === "this") {
-    const existing = localEvents.find(e => e.recurring_event_id === primaryId && e.original_date === occDate);
+    const existing = findOverride(primaryId, occDate);
     if (existing) {
-      await db(`UPDATE app_calendar__events SET is_cancelled=1,updated_at=? WHERE id=?`, [now, existing.id]);
+      // Claims the parent too, for the reason submitEdit's matching branch
+      // gives: cancelling an override only means anything while the series
+      // that generates that date still stands.
+      applied = await guardedBatch([
+        claimSeries(primary, now, parentVersion),
+        updateEvent({ id: existing.id, version: overrideVersion, now,
+          set: { is_cancelled: 1 } }),
+      ]);
     } else {
       const exId = crypto.randomUUID();
-      await db(`INSERT INTO app_calendar__events (id,title,description,location,start_date,start_time,end_date,end_time,all_day,color,organizer_id,attendee_ids,recurring_event_id,original_date,is_cancelled,source,created_by,created_at,updated_at)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,'local',?,?,?)`,
-        [exId,primary.title,primary.description,primary.location,occDate,primary.start_time,occDate,primary.end_time,primary.all_day,primary.color,ME?.id??null,"[]",primaryId,occDate,ME?.id??null,now,now]);
+      // A cancellation is still an override row, and it carries the series'
+      // title, description and location. `visibility` comes from the series
+      // for exactly the reason the other three INSERTs give — the column
+      // defaults to 'everyone', so a private series' details would land in a
+      // row the whole household can read. Never being RENDERED is not the same
+      // as never being readable.
+      applied = await guardedBatch([
+        claimSeries(primary, now, parentVersion),
+        insertOverride({ id: exId, primary, occDate, actor: ME?.id ?? null, now, cancelled: true,
+          values: { ...primary, start_date: occDate, end_date: occDate,
+                    organizer_id: ME?.id ?? null, attendee_ids: "[]" } }),
+      ]);
     }
   } else if (scope === "following") {
     const rule = JSON.parse(primary.recurrence ?? "{}");
     rule.end_date = addDayStr(occDate, -1); rule.end_type = "date";
-    await dbBatch([
-      { sql: `UPDATE app_calendar__events SET recurrence=?,updated_at=? WHERE id=?`, params: [JSON.stringify(rule), now, primaryId] },
+    applied = await guardedBatch([
+      updateEvent({ id: primaryId, version: parentVersion, now,
+        set: { recurrence: JSON.stringify(rule) } }),
       { sql: `DELETE FROM app_calendar__events WHERE recurring_event_id=? AND original_date>=?`, params: [primaryId, occDate] },
     ]);
   }
   await loadLocalEvents(); closeModal(); render();
+  if (!applied) showWriteError("This event could not be deleted. It may have been changed or removed — the calendar has been refreshed.");
 }
 
 // ─── Scope picker ─────────────────────────────────────────────────────────
-function openScopeModal(action, primaryId, occDate) {
-  const isEdit = action === "edit";
+function openScopeModal(action, primaryId, occDate, dropKey = null) {
+  // "move" is a drop that has already happened: the event is on screen at its
+  // new time and this picker decides which occurrences keep it. The other two
+  // are openers, and their option runs after this modal closes.
+  const verb = action === "edit" ? "edit" : action === "delete" ? "delete" : "move";
+  const heading = action === "edit" ? "Edit recurring event"
+    : action === "delete" ? "Delete recurring event"
+    : "Move recurring event";
+  // The move branch passes an integer key, never the id: _dropScope owns both
+  // closing this modal and suppressing the dismissal cleanup, which a bare
+  // closeModal() in the markup would run against a drop that is going ahead.
+  // Versions are read HERE, when the picker opens, for the reason submitEdit
+  // gives: this modal is user-held, and deleteEvent re-reading `localEvents`
+  // after it closes would claim whatever changed underneath it. Captured
+  // before a scope is known, so both are passed and each branch names the row
+  // it writes.
+  const delPrimary = action === "delete" ? localEvents.find(e => e.id === primaryId) : null;
+  const delOverride = action === "delete" ? findOverride(primaryId, occDate) : null;
+  const pick = (scope) =>
+    action === "move"   ? `_dropScope(${dropKey},'${scope}')`
+    : action === "edit" ? `closeModal();openDirectEdit_('${primaryId}','${scope}','${occDate}')`
+    :                     `closeModal();deleteEvent('${primaryId}','${occDate}','${scope}','${delPrimary?.updated_at ?? ""}','${delOverride?.updated_at ?? ""}')`;
   const scopeOpts = [
     { scope: "this",      icon: "📌", label: "This event",               desc: `Only ${fmtDateShort(occDate)}` },
     { scope: "following", icon: "➡️", label: "This and following events", desc: `From ${fmtDateShort(occDate)} onwards` },
@@ -2026,12 +2684,12 @@ function openScopeModal(action, primaryId, occDate) {
   ];
   openModal(`
     <div class="modal-header">
-      <h3>${isEdit ? "Edit recurring event" : "Delete recurring event"}</h3>
+      <h3>${heading}</h3>
       <button class="btn btn-ghost btn-sm" data-testid="modal-close" onclick="closeModal()">✕</button>
     </div>
-    <p style="font-size:.85rem;color:var(--muted);margin-bottom:14px">Which events do you want to ${isEdit ? "edit" : "delete"}?</p>
+    <p style="font-size:.85rem;color:var(--muted);margin-bottom:14px">Which events do you want to ${verb}?</p>
     ${scopeOpts.map(o => `
-      <div class="scope-option" data-testid="scope-option" data-scope="${o.scope}" onclick="${isEdit ? `closeModal();openDirectEdit_('${primaryId}','${o.scope}','${occDate}')` : `closeModal();deleteEvent('${primaryId}','${occDate}','${o.scope}')`}">
+      <div class="scope-option" data-testid="scope-option" data-scope="${o.scope}" onclick="${pick(o.scope)}">
         <span class="scope-icon">${o.icon}</span>
         <div><div class="scope-label">${o.label}</div><div class="scope-desc">${o.desc}</div></div>
       </div>`).join("")}
@@ -2060,7 +2718,15 @@ function openModal(html, testid = "modal") {
   // attribute, which the browser blocks) because it rides the user's click gesture.
   modalEl.querySelector("[data-autofocus]")?.focus();
 }
-function closeModal() { modalEl?.remove(); modalEl = null; }
+function closeModal() {
+  modalEl?.remove();
+  modalEl = null;
+  // Cleared BEFORE running, so a cleanup that itself opens a modal (or throws)
+  // cannot be run a second time by that modal's own close.
+  const cb = onModalClose;
+  onModalClose = null;
+  cb?.();
+}
 
 // ─── Navigation ───────────────────────────────────────────────────────────
 function refreshSyncedAndRender() {
