@@ -1,6 +1,6 @@
 # Calendar
 
-A [Chickadee Bandit](http://chickadeebandit.com) app.
+A [Chickadee Bandit](https://chickadeebandit.com/app-library/calendar) app.
 
 Family calendar with manual event creation, recurring events, and series editing. Shows month and agenda views. Merges in events synced from Google Calendar and Apple Calendar.
 
