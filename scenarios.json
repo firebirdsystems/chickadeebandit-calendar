@@ -1,0 +1,131 @@
+{
+  "scenarios": [
+    {
+      "name": "a private event is visible only to its creator; an everyone event is visible to the whole household",
+      "members": { "owner": "adult", "other": "adult", "kid": "child" },
+      "steps": [
+        {
+          "action": "seedRaw",
+          "sql": "INSERT INTO app_calendar__events (id, title, start_date, end_date, created_by, visibility, created_at, updated_at) VALUES ('ev-pub', 'Family dinner', '2026-01-10', '2026-01-10', ?, 'everyone', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'), ('ev-priv', 'Therapy', '2026-01-11', '2026-01-11', ?, 'private', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')",
+          "params": ["{{owner}}", "{{owner}}"]
+        },
+        {
+          "action": "db",
+          "as": "other",
+          "sql": "SELECT id FROM app_calendar__events ORDER BY id",
+          "expect": { "status": 200, "rowCount": 1, "rowsContain": [{ "id": "ev-pub" }] }
+        },
+        {
+          "action": "db",
+          "as": "kid",
+          "sql": "SELECT id FROM app_calendar__events ORDER BY id",
+          "expect": { "status": 200, "rowCount": 1, "rowsContain": [{ "id": "ev-pub" }] }
+        },
+        {
+          "action": "db",
+          "as": "owner",
+          "sql": "SELECT id FROM app_calendar__events ORDER BY id",
+          "expect": { "status": 200, "rowCount": 2, "rowsContain": [{ "id": "ev-pub" }, { "id": "ev-priv" }] }
+        }
+      ]
+    },
+    {
+      "name": "writes follow reads: another adult cannot edit or delete an event they cannot see",
+      "members": { "owner": "adult", "other": "adult" },
+      "steps": [
+        {
+          "action": "seedRaw",
+          "sql": "INSERT INTO app_calendar__events (id, title, start_date, end_date, created_by, visibility, created_at, updated_at) VALUES ('ev-priv', 'Therapy', '2026-01-11', '2026-01-11', ?, 'private', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')",
+          "params": ["{{owner}}"]
+        },
+        {
+          "action": "db",
+          "as": "other",
+          "sql": "UPDATE app_calendar__events SET start_date = '2026-02-01', end_date = '2026-02-01' WHERE id = 'ev-priv'"
+        },
+        {
+          "action": "db",
+          "as": "other",
+          "sql": "DELETE FROM app_calendar__events WHERE id = 'ev-priv'"
+        },
+        {
+          "action": "db",
+          "as": "owner",
+          "sql": "SELECT id, start_date FROM app_calendar__events WHERE id = 'ev-priv'",
+          "expect": { "status": 200, "rowCount": 1, "rowsContain": [{ "id": "ev-priv", "start_date": "2026-01-11" }] }
+        },
+        {
+          "action": "db",
+          "as": "owner",
+          "sql": "UPDATE app_calendar__events SET start_date = '2026-02-01', end_date = '2026-02-01' WHERE id = 'ev-priv'",
+          "expect": { "status": 200 }
+        },
+        {
+          "action": "db",
+          "as": "owner",
+          "sql": "SELECT id, start_date FROM app_calendar__events WHERE id = 'ev-priv'",
+          "expect": { "status": 200, "rowCount": 1, "rowsContain": [{ "id": "ev-priv", "start_date": "2026-02-01" }] }
+        }
+      ]
+    },
+    {
+      "name": "an insert cannot attribute an event to someone else; created_by is forced to the caller",
+      "members": { "owner": "adult", "forger": "adult" },
+      "steps": [
+        {
+          "action": "db",
+          "as": "forger",
+          "sql": "INSERT INTO app_calendar__events (id, title, start_date, end_date, created_by, visibility, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+          "params": ["ev-forged", "Not mine", "2026-01-12", "2026-01-12", "{{owner}}", "private", "2026-01-01T00:00:00Z", "2026-01-01T00:00:00Z"],
+          "expect": { "status": 200 }
+        },
+        {
+          "action": "db",
+          "as": "owner",
+          "sql": "SELECT id FROM app_calendar__events WHERE id = 'ev-forged'",
+          "expect": { "status": 200, "rowCount": 0 }
+        },
+        {
+          "action": "db",
+          "as": "forger",
+          "sql": "SELECT id FROM app_calendar__events WHERE id = 'ev-forged' AND created_by = ?",
+          "params": ["{{forger}}"],
+          "expect": { "status": 200, "rowCount": 1, "rowsContain": [{ "id": "ev-forged" }] }
+        }
+      ]
+    },
+    {
+      "name": "upcoming_events lists future events, drops ended ones and ones cancelled via cancel_event",
+      "members": { "owner": "adult" },
+      "steps": [
+        {
+          "action": "seedRaw",
+          "sql": "INSERT INTO app_calendar__events (id, title, start_date, end_date, created_by, visibility, created_at, updated_at) VALUES ('ev-future', 'Reunion', '2099-06-01', '2099-06-01', ?, 'everyone', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'), ('ev-future2', 'Graduation', '2099-07-01', '2099-07-01', ?, 'everyone', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'), ('ev-past', 'Old party', '2020-01-01', '2020-01-01', ?, 'everyone', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')",
+          "params": ["{{owner}}", "{{owner}}", "{{owner}}"]
+        },
+        {
+          "action": "named",
+          "as": "owner",
+          "kind": "query",
+          "name": "upcoming_events",
+          "expect": { "status": 200, "rowCount": 2, "rowsContain": [{ "id": "ev-future" }, { "id": "ev-future2" }] }
+        },
+        {
+          "action": "named",
+          "as": "owner",
+          "kind": "mutation",
+          "name": "cancel_event",
+          "params": ["ev-future2"],
+          "expect": { "status": 200 }
+        },
+        {
+          "action": "named",
+          "as": "owner",
+          "kind": "query",
+          "name": "upcoming_events",
+          "expect": { "status": 200, "rowCount": 1, "rowsContain": [{ "id": "ev-future" }] }
+        }
+      ]
+    }
+  ]
+}
