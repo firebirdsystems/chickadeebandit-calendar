@@ -51,7 +51,7 @@
       "description": "Add an all-day event when another app records something dated — a renewal to decide on, a care visit, a capsule's reveal day. When the other app supplies a steady reference for the thing itself, a date that later moves MOVES the entry this already made instead of adding a second one beside it, and \"Take a date off the calendar\" can take that same entry back down.",
       "params": {
         "title": { "type": "text", "label": "Event title", "required": true },
-        "event_date": { "type": "text", "label": "Date (yyyy-mm-dd)", "required": true },
+        "event_date": { "type": "text", "format": "date", "label": "Date (yyyy-mm-dd)", "required": true },
         "description": { "type": "text", "label": "Description", "default": "" },
         "source_ref_id": {
           "type": "text",
