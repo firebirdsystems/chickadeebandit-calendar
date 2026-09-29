@@ -428,6 +428,11 @@
       padding: 10px 12px; font-size: 0.8rem; color: var(--hub-tint-warning-fg, #92400e); margin-top: 12px;
     }
     .conflict-box ul { margin: 4px 0 0 18px; }
+    .cross-notice {
+      background: var(--hub-tint-warning, #fffbeb); border: 1px solid var(--hub-tint-warning-border, #fcd34d); border-radius: 8px;
+      padding: 8px 12px; font-size: 0.8rem; color: var(--hub-tint-warning-fg, #92400e); margin: 0 0 10px;
+    }
+    .cross-notice[hidden] { display: none; }
     .search-row { margin-bottom: 12px; }
     .search-input {
       width: 100%; border: 1.5px solid var(--border-mid, var(--border, #d1d5db));
@@ -458,11 +463,12 @@
     </div>
   </div>
   <div class="member-bar" id="member-bar" data-testid="member-bar"></div>
+  <div class="cross-notice" id="cross-notice" data-testid="cross-notice" hidden></div>
   <div id="root" data-testid="root"><div class="loading">Loading…</div></div>
 </div>
 
 <script type="module">
-import { memberColor, initial, esc, isAdult, hubConfirm, searchMatch, hubToday } from "/hub-sdk.js";
+import { memberColor, initial, esc, isAdult, hubConfirm, searchMatch, hubToday, readContext } from "/hub-sdk.js";
 import {
   MONTHS, MONTHS_SHORT, DAYS_SHORT, DAYS_ABBR, DAY_NAMES, EVENT_COLORS,
   p2, toDateStr, parseLD, addDaysObj, addDayStr, todayStr, daysBetween, getWeekStart,
@@ -530,6 +536,7 @@ async function publishEvent(type, subjectId, payload = {}) {
 let members      = [];
 let localEvents  = [];
 let syncedEvents = [];
+let crossAppShortfall = null; // set by loadSyncedEvents, shown by render()
 let memberFilter = new Set();
 let viewMode     = "week";
 let searchQ = "";       // in-app search (see logic.js searchableFields)
@@ -648,10 +655,16 @@ async function loadLocalEvents(exceptId = null) {
 async function loadSyncedEvents() {
   if (!CONTEXT) return;
   try {
-    const res  = await fetch(`${CONTEXT}?keys=family.calendar,cross.calendar_events`);
-    const data = await res.json();
+    const { data, partial, errors } = await readContext(["family.calendar", "cross.calendar_events"]);
     const raw            = data["family.calendar"] ?? [];
     const crossAppEvents = data["cross.calendar_events"] ?? [];
+    // The hub says when a fan-out was cut at its ceilings or a source failed;
+    // a short list would otherwise look complete. Rendered in render().
+    crossAppShortfall = partial.includes("cross.calendar_events")
+      ? "Some events from other apps aren't shown — the hub served a partial list."
+      : errors.includes("cross.calendar_events")
+        ? "Events from other apps couldn't be loaded right now."
+        : null;
     const normalizeBase = ev => ({
       id: ev.id ?? crypto.randomUUID(), title: ev.title ?? ev.summary ?? "Event",
       description: ev.description ?? "", location: ev.location ?? "",
@@ -783,10 +796,18 @@ function render() {
   _evReg = [];
   updateTitle();
   renderMemberBar();
+  renderCrossNotice();
   if (viewMode === "month")  renderMonth();
   else if (viewMode === "week") renderWeek();
   else if (viewMode === "day")  renderDay();
   else renderAgenda();
+}
+
+function renderCrossNotice() {
+  const el = document.getElementById("cross-notice");
+  if (!el) return;
+  el.hidden = !crossAppShortfall;
+  el.textContent = crossAppShortfall ? `⚠️ ${crossAppShortfall}` : "";
 }
 
 // ─── Member filter bar ────────────────────────────────────────────────────
