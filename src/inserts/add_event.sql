@@ -27,7 +27,7 @@ INSERT INTO app_calendar__events (
   '#0f766e',
   '[]',
   'local',
-  'ai',
+  $6,
   datetime('now'),
   datetime('now')
 )

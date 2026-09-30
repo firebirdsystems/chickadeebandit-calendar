@@ -126,6 +126,30 @@
           "expect": { "status": 200, "rowCount": 1, "rowsContain": [{ "id": "ev-future" }] }
         }
       ]
+    },
+    {
+      "name": "an AI-added event is stamped with the calling member, whatever creator it names",
+      "members": { "parent": "adult", "other": "adult" },
+      "steps": [
+        {
+          "action": "named",
+          "as": "parent",
+          "kind": "insert",
+          "name": "add_event",
+          "params": ["Dentist", "2026-10-01", "2026-10-01", "09:30", null, "{{other}}"],
+          "expect": { "status": 200 }
+        },
+        {
+          "action": "db",
+          "as": "parent",
+          "sql": "SELECT title, created_by, all_day FROM app_calendar__events",
+          "expect": {
+            "status": 200,
+            "rowCount": 1,
+            "rowsContain": [{ "title": "Dentist", "created_by": "scn-parent", "all_day": 0 }]
+          }
+        }
+      ]
     }
   ]
 }
