@@ -729,10 +729,9 @@ function eventsForRange(rangeStart, rangeEnd, { filtered = true } = {}) {
   });
 }
 // `count` belongs to the SERIES — "ten lessons" is the first ten, not ten in
-// whatever range is on screen. A counted rule is therefore walked from its
-// start, counting every occurrence and keeping the ones in range; the
-// skip-ahead is for uncounted rules, where the position in the series does not
-// matter. Applied to the occurrences emitted instead, every month drawn after
+// whatever range is on screen. A counted rule therefore counts every
+// occurrence from its start, the ones the skip-ahead jumps over included, and
+// keeps those in range. Applied to the occurrences emitted instead, every month drawn after
 // the series began handed out the whole count again.
 // The hub's ICS feed carries a port of this function (calendar-feed.ts in the
 // hub repo): keep the two in step.
@@ -744,12 +743,17 @@ function occurrencesInRange(startDate, rule, rangeStart, rangeEnd) {
   const counted = rule.count != null && Number.isFinite(Number(rule.count));
   let seen = 0;
   let cursor = parseLD(startDate);
-  if (cursor < rs && !counted) {
+  if (cursor < rs) {
+    // Jump most of the way to the range rather than walking there. Each jump
+    // is a whole number of the rule's own steps, so for a counted rule the
+    // occurrences jumped over are that many, and they are counted.
     const { freq, interval: iv = 1 } = rule;
-    if (freq === "daily") { const skip = Math.max(0, Math.floor((rs - cursor) / 86400000 / iv) - 1); cursor = addDaysObj(cursor, skip * iv); }
-    else if (freq === "weekly" && (!rule.days || rule.days.length <= 1)) { const skip = Math.max(0, Math.floor((rs - cursor) / (86400000 * 7 * iv)) - 1); cursor = addDaysObj(cursor, skip * 7 * iv); }
-    else if (freq === "monthly") { const mo = (rs.getFullYear() - cursor.getFullYear()) * 12 + rs.getMonth() - cursor.getMonth(); cursor.setMonth(cursor.getMonth() + Math.max(0, Math.floor(mo / iv) - 1) * iv); }
-    else if (freq === "yearly") { const yr = rs.getFullYear() - cursor.getFullYear(); cursor.setFullYear(cursor.getFullYear() + Math.max(0, Math.floor(yr / iv) - 1) * iv); }
+    let skipped = 0;
+    if (freq === "daily") { skipped = Math.max(0, Math.floor((rs - cursor) / 86400000 / iv) - 1); cursor = addDaysObj(cursor, skipped * iv); }
+    else if (freq === "weekly" && (!rule.days || rule.days.length <= 1)) { skipped = Math.max(0, Math.floor((rs - cursor) / (86400000 * 7 * iv)) - 1); cursor = addDaysObj(cursor, skipped * 7 * iv); }
+    else if (freq === "monthly") { const mo = (rs.getFullYear() - cursor.getFullYear()) * 12 + rs.getMonth() - cursor.getMonth(); skipped = Math.max(0, Math.floor(mo / iv) - 1); cursor.setMonth(cursor.getMonth() + skipped * iv); }
+    else if (freq === "yearly") { const yr = rs.getFullYear() - cursor.getFullYear(); skipped = Math.max(0, Math.floor(yr / iv) - 1); cursor.setFullYear(cursor.getFullYear() + skipped * iv); }
+    if (counted && Number.isFinite(skipped)) seen = skipped;
   }
   let iter = 0;
   while (cursor <= re && results.length < 10000 && iter++ < 3000) {
