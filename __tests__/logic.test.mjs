@@ -3,7 +3,7 @@ import {
   MONTHS, MONTHS_SHORT, DAYS_SHORT, DAY_NAMES, EVENT_COLORS,
   p2, toDateStr, parseLD, addDaysObj, addDayStr, daysBetween, getWeekStart,
   timeToMins, fmtTime, fmtDate, fmtDateShort,
-  normalizeDate, normalizeTime,
+  normalizeDate, normalizeTime, zonedDateTime, allDayEndDate, spreadAcrossDays, drawnSpanMins,
   describeRecurrence, advanceCursor,
   memberIdsOf, eventsOverlap, findMemberConflicts, searchableFields,
   SNAP_MINS, DEFAULT_DURATION_MINS,
@@ -185,6 +185,140 @@ describe("normalizeDate", () => {
 
   it("returns fallback for null", () => {
     expect(normalizeDate(null, "2025-01-01")).toBe("2025-01-01");
+  });
+});
+
+describe("zonedDateTime", () => {
+  it("puts an instant on the household's calendar, not on UTC's", () => {
+    // 2 pm in Denver. Cut out of the string, this was drawn at 8 pm.
+    expect(zonedDateTime("2026-10-04T20:00:00.000Z", "America/Denver")).toEqual({ date: "2026-10-04", time: "14:00" });
+    // An evening event is the next day in UTC and must stay on its own.
+    expect(zonedDateTime("2026-10-05T02:30:00.000Z", "America/Denver")).toEqual({ date: "2026-10-04", time: "20:30" });
+    // East of Greenwich it goes the other way.
+    expect(zonedDateTime("2026-10-04T22:15:00Z", "Australia/Sydney")).toEqual({ date: "2026-10-05", time: "09:15" });
+    expect(zonedDateTime("2026-10-04T14:00:00-06:00", "America/Denver")).toEqual({ date: "2026-10-04", time: "14:00" });
+  });
+
+  it("writes midnight as 00:00", () => {
+    expect(zonedDateTime("2026-10-04T06:00:00Z", "America/Denver")).toEqual({ date: "2026-10-04", time: "00:00" });
+  });
+
+  it("follows the zone through a daylight-saving change", () => {
+    expect(zonedDateTime("2026-07-01T20:00:00Z", "America/Denver").time).toBe("14:00");
+    expect(zonedDateTime("2026-12-01T20:00:00Z", "America/Denver").time).toBe("13:00");
+  });
+
+  it("leaves a floating time, a bare date and anything unreadable to the caller", () => {
+    expect(zonedDateTime("2026-10-04T14:00", "America/Denver")).toBeNull();
+    expect(zonedDateTime("2026-10-04T14:00:00", "America/Denver")).toBeNull();
+    expect(zonedDateTime("2026-10-04", "America/Denver")).toBeNull();
+    expect(zonedDateTime("2026-13-45T99:00:00Z", "America/Denver")).toBeNull();
+    expect(zonedDateTime(null, "America/Denver")).toBeNull();
+  });
+
+  it("falls back to the device's zone when the household's is missing or unusable", () => {
+    const device = zonedDateTime("2026-10-04T20:00:00Z", null);
+    expect(device).toMatchObject({ date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/), time: expect.stringMatching(/^\d{2}:\d{2}$/) });
+    expect(zonedDateTime("2026-10-04T20:00:00Z", "Not/AZone")).toEqual(device);
+  });
+});
+
+describe("allDayEndDate", () => {
+  it("reads a synced all-day event's end as exclusive", () => {
+    expect(allDayEndDate("2026-10-04T00:00:00.000Z", "2026-10-05T00:00:00.000Z")).toBe("2026-10-04");
+    expect(allDayEndDate("2026-10-04T00:00:00.000Z", "2026-10-07T00:00:00.000Z")).toBe("2026-10-06");
+  });
+
+  it("never ends before it starts", () => {
+    expect(allDayEndDate("2026-10-04T00:00:00.000Z", "2026-10-04T00:00:00.000Z")).toBe("2026-10-04");
+    expect(allDayEndDate("2026-10-04T00:00:00.000Z", "garbageT00:00Z")).toBe("2026-10-04");
+  });
+
+  it("takes a plain date as the last day it names", () => {
+    expect(allDayEndDate("2026-10-04", "2026-10-06")).toBe("2026-10-06");
+    expect(allDayEndDate("2026-10-04", null)).toBe("2026-10-04");
+    expect(allDayEndDate(null, null, "2026-01-01")).toBe("2026-01-01");
+  });
+});
+
+describe("drawnSpanMins", () => {
+  it("runs a spanning event to midnight on the day it starts", () => {
+    // 14:00 on the 4th to 11:00 on the 6th: read as same-day times this ends
+    // before it starts, and was drawn as a stub.
+    const conference = { start_date: "2026-10-04", start_time: "14:00", end_date: "2026-10-06", end_time: "11:00" };
+    expect(drawnSpanMins(conference)).toEqual({ start: 840, end: 1440 });
+    expect(drawnSpanMins({ start_date: "2026-10-04", start_time: "22:00", end_date: "2026-10-05", end_time: "00:00" }))
+      .toEqual({ start: 1320, end: 1440 });
+    // The event keeps its own end for the detail view and the form.
+    expect(conference.end_time).toBe("11:00");
+  });
+
+  it("is the event's own span when it stays inside one day", () => {
+    const meeting = { start_date: "2026-10-04", start_time: "09:00", end_date: "2026-10-04", end_time: "10:30" };
+    expect(drawnSpanMins(meeting)).toEqual(eventSpanMins(meeting));
+    const noEnd = { start_date: "2026-10-04", start_time: "09:00", end_date: "2026-10-04", end_time: null };
+    expect(drawnSpanMins(noEnd)).toEqual(eventSpanMins(noEnd));
+    expect(drawnSpanMins({ start_time: "09:00", end_time: "10:00" })).toEqual({ start: 540, end: 600 });
+  });
+});
+
+describe("spreadAcrossDays", () => {
+  const trip = { id: "trip", title: "Trip", start_date: "2026-10-03", end_date: "2026-10-06", all_day: 1, _date: "2026-10-03" };
+  const days = (events) => events.map((e) => `${e.id}@${e._date}${e._continued ? "+" : ""}`);
+
+  it("puts a spanning event on every day it covers", () => {
+    expect(days(spreadAcrossDays([trip], "2026-10-01", "2026-10-31")))
+      .toEqual(["trip@2026-10-03", "trip@2026-10-04+", "trip@2026-10-05+", "trip@2026-10-06+"]);
+  });
+
+  it("draws an event already under way when its first day is off screen", () => {
+    // The day view of the 4th: the trip began on the 3rd and was drawn nowhere.
+    expect(days(spreadAcrossDays([trip], "2026-10-04", "2026-10-04"))).toEqual(["trip@2026-10-04+"]);
+    expect(days(spreadAcrossDays([trip], "2026-10-05", "2026-10-12"))).toEqual(["trip@2026-10-05+", "trip@2026-10-06+"]);
+    expect(days(spreadAcrossDays([trip], "2026-09-28", "2026-10-04"))).toEqual(["trip@2026-10-03", "trip@2026-10-04+"]);
+  });
+
+  it("drops an entry whose day is outside the range and leaves a one-day event alone", () => {
+    const single = { id: "one", start_date: "2026-10-04", end_date: "2026-10-04", start_time: "09:00", end_time: "10:00", _date: "2026-10-04" };
+    expect(spreadAcrossDays([single], "2026-10-04", "2026-10-04")).toEqual([single]);
+    expect(spreadAcrossDays([single, trip], "2026-10-07", "2026-10-09")).toEqual([]);
+  });
+
+  it("keeps the start time on the first day and shows the later days as all-day", () => {
+    const conference = {
+      id: "conf", start_date: "2026-10-04", start_time: "14:00", end_date: "2026-10-06", end_time: "11:00", all_day: 0, _date: "2026-10-04",
+    };
+    const [first, second, third] = spreadAcrossDays([conference], "2026-10-01", "2026-10-31");
+    expect(first).toBe(conference);
+    expect(second).toMatchObject({ _date: "2026-10-05", _continued: true, all_day: 1, id: "conf", start_date: "2026-10-04" });
+    expect(third).toMatchObject({ _date: "2026-10-06", _continued: true, all_day: 1 });
+    // The event itself is not changed by being drawn.
+    expect(conference.all_day).toBe(0);
+  });
+
+  it("does not run an evening that ends at midnight into the next day", () => {
+    const late = { id: "late", start_date: "2026-10-04", start_time: "22:00", end_date: "2026-10-05", end_time: "00:00", all_day: 0, _date: "2026-10-04" };
+    expect(days(spreadAcrossDays([late], "2026-10-01", "2026-10-31"))).toEqual(["late@2026-10-04"]);
+    const twoNights = { ...late, id: "two", end_date: "2026-10-06" };
+    expect(days(spreadAcrossDays([twoNights], "2026-10-01", "2026-10-31"))).toEqual(["two@2026-10-04", "two@2026-10-05+"]);
+  });
+
+  it("spreads from the occurrence's own day, carrying what opens the right occurrence", () => {
+    const occurrence = {
+      id: "series", _primaryId: "series", _occDate: "2026-10-10", _virtual: true,
+      start_date: "2026-10-10", end_date: "2026-10-11", all_day: 1, _date: "2026-10-10",
+    };
+    const [, continued] = spreadAcrossDays([occurrence], "2026-10-01", "2026-10-31");
+    expect(continued).toMatchObject({ _date: "2026-10-11", _primaryId: "series", _occDate: "2026-10-10" });
+  });
+
+  it("is bounded by the range, not by the event, and tolerates a row with no dates", () => {
+    const endless = { id: "x", start_date: "2026-10-04", end_date: "2126-10-04", all_day: 1, _date: "2026-10-04" };
+    expect(spreadAcrossDays([endless], "2026-10-01", "2026-10-07")).toHaveLength(4);
+    const inverted = { id: "inv", start_date: "2026-10-04", end_date: "2026-10-01", all_day: 1, _date: "2026-10-04" };
+    expect(days(spreadAcrossDays([inverted], "2026-10-01", "2026-10-07"))).toEqual(["inv@2026-10-04"]);
+    const broken = { id: "b" };
+    expect(spreadAcrossDays([broken], "2026-10-01", "2026-10-07")).toEqual([broken]);
   });
 });
 

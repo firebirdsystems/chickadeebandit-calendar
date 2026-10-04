@@ -468,15 +468,15 @@
 </div>
 
 <script type="module">
-import { memberColor, initial, esc, isAdult, hubConfirm, searchMatch, hubToday, readContext } from "/hub-sdk.js";
+import { memberColor, initial, esc, isAdult, hubConfirm, searchMatch, hubToday, hubTimeZone, readContext } from "/hub-sdk.js";
 import {
   MONTHS, MONTHS_SHORT, DAYS_SHORT, DAYS_ABBR, DAY_NAMES, EVENT_COLORS,
   p2, toDateStr, parseLD, addDaysObj, addDayStr, todayStr, daysBetween, getWeekStart,
   timeToMins, fmtTime, fmtDate, fmtDateShort,
-  normalizeDate, normalizeTime,
+  normalizeDate, normalizeTime, zonedDateTime, allDayEndDate, spreadAcrossDays,
   describeRecurrence, advanceCursor,
   memberIdsOf, findMemberConflicts, searchableFields,
-  eventSpanMins, applyMove, applyResize, isDraggableEvent,
+  eventSpanMins, drawnSpanMins, applyMove, applyResize, isDraggableEvent,
   applyMoveAcrossDays, pickColumnDate, autoScrollVelocity,
   isNoopDragPatch, dragChangesDate,
   isSeriesOccurrence, isSeriesException, dragMayChangeDay, splitRecurrence,
@@ -665,17 +665,35 @@ async function loadSyncedEvents() {
       : errors.includes("cross.calendar_events")
         ? "Events from other apps couldn't be loaded right now."
         : null;
-    const normalizeBase = ev => ({
+    const timeZone = hubTimeZone();
+    const normalizeBase = ev => {
+      const allDay = Boolean(ev.all_day ?? ev.allDay);
+      const startDay = ev.start ?? ev.startAt ?? ev.start_at ?? ev.start_date ?? ev.date ?? ev.scheduled_at;
+      const startClock = ev.start ?? ev.startAt ?? ev.start_at ?? ev.scheduled_at;
+      const endDay = ev.end ?? ev.endAt ?? ev.end_at ?? ev.end_date ?? ev.date ?? ev.scheduled_at;
+      const endClock = ev.end ?? ev.endAt ?? ev.end_at;
+      // A synced event's times are instants (UTC); the calendar is drawn on the
+      // household's. An all-day one is a DATE, and is never shifted by a zone.
+      // The day and the clock are usually read from the same string: each is
+      // converted once.
+      const converted = new Map();
+      const local = iso => {
+        if (allDay) return null;
+        if (!converted.has(iso)) converted.set(iso, zonedDateTime(iso, timeZone));
+        return converted.get(iso);
+      };
+      return {
       id: ev.id ?? crypto.randomUUID(), title: ev.title ?? ev.summary ?? "Event",
       description: ev.description ?? "", location: ev.location ?? "",
-      start_date: normalizeDate(ev.start ?? ev.startAt ?? ev.start_at ?? ev.start_date ?? ev.date ?? ev.scheduled_at, hubToday()),
-      start_time: normalizeTime(ev.start ?? ev.startAt ?? ev.start_at ?? ev.scheduled_at),
-      end_date: normalizeDate(ev.end ?? ev.endAt ?? ev.end_at ?? ev.end_date ?? ev.date ?? ev.scheduled_at, hubToday()),
-      end_time: normalizeTime(ev.end ?? ev.endAt ?? ev.end_at), all_day: (ev.all_day ?? ev.allDay) ? 1 : 0,
+      start_date: local(startDay)?.date ?? normalizeDate(startDay, hubToday()),
+      start_time: local(startClock)?.time ?? normalizeTime(startClock),
+      end_date: allDay ? allDayEndDate(startDay, endDay, hubToday()) : local(endDay)?.date ?? normalizeDate(endDay, hubToday()),
+      end_time: local(endClock)?.time ?? normalizeTime(endClock), all_day: allDay ? 1 : 0,
       color: "#6b7280", organizer_id: (ev.member_ids?.[0]) ?? ev.familyMemberId ?? ev.family_member_id ?? null,
       calendar_name: ev.calendarName ?? ev.calendar_name ?? null,
       attendee_ids: ev.member_ids ? JSON.stringify(ev.member_ids) : "[]",
-    });
+      };
+    };
     const { rows: hidden } = await db(`SELECT event_id FROM app_calendar__hidden_synced_events`);
     const hiddenIds = new Set((hidden ?? []).map(r => r.event_id));
     const allSynced = [
@@ -687,7 +705,9 @@ async function loadSyncedEvents() {
 }
 
 // ─── Recurrence expansion ─────────────────────────────────────────────────
-function eventsForRange(rangeStart, rangeEnd, { filtered = true } = {}) {
+// `spread`: one entry per day an event covers, which is what a view draws.
+// A caller that wants each event ONCE — the conflict check — turns it off.
+function eventsForRange(rangeStart, rangeEnd, { filtered = true, spread = true } = {}) {
   const results = [];
   const exMap = {};
   for (const ev of localEvents) {
@@ -703,8 +723,9 @@ function eventsForRange(rangeStart, rangeEnd, { filtered = true } = {}) {
         results.push({ ...ev, _date: ev.start_date });
     } else {
       const rule = JSON.parse(ev.recurrence);
-      const occs = occurrencesInRange(ev.start_date, rule, rangeStart, rangeEnd);
       const durDays = daysBetween(ev.start_date, ev.end_date);
+      // An occurrence that began before the range can still reach into it.
+      const occs = occurrencesInRange(ev.start_date, rule, spread && durDays > 0 ? addDayStr(rangeStart, -durDays) : rangeStart, rangeEnd);
       for (const occ of occs) {
         const ex = exMap[ev.id]?.[occ];
         if (ex?.is_cancelled) continue;
@@ -717,9 +738,10 @@ function eventsForRange(rangeStart, rangeEnd, { filtered = true } = {}) {
     if (ev.start_date <= rangeEnd && ev.end_date >= rangeStart)
       results.push({ ...ev, _date: ev.start_date });
   }
+  const drawn = spread ? spreadAcrossDays(results, rangeStart, rangeEnd) : results;
   const visible = filtered && memberFilter.size
-    ? results.filter(ev => { const ids = memberIdsOf(ev); return [...memberFilter].some(id => ids.has(id)); })
-    : results;
+    ? drawn.filter(ev => { const ids = memberIdsOf(ev); return [...memberFilter].some(id => ids.has(id)); })
+    : drawn;
   return visible.sort((a, b) => {
     const dc = a._date.localeCompare(b._date);
     if (dc !== 0) return dc;
@@ -946,7 +968,9 @@ function renderTimeGrid(dates) {
       let placed = false;
       for (const col of cols) {
         const last = col[col.length - 1];
-        const lastEnd = timeToMins(last.end_time) ?? ((timeToMins(last.start_time) ?? 0) + 60);
+        // An event that runs past the day occupies its column to midnight.
+        const lastEnd = last.end_date > last.start_date ? 24 * 60
+          : timeToMins(last.end_time) ?? ((timeToMins(last.start_time) ?? 0) + 60);
         if (startM >= lastEnd) { col.push(ev); placed = true; break; }
       }
       if (!placed) cols.push([ev]);
@@ -957,7 +981,9 @@ function renderTimeGrid(dates) {
       // Same span the drag math reads — see eventSpanMins. A second copy of
       // this rule here is how the renderer and the drag handlers came to
       // disagree about an inverted end_time.
-      const { start: startM, end: endM } = eventSpanMins(ev);
+      // (A spanning event cannot be dragged, so clipping its box to the day
+      // it sits on leaves the two in agreement.)
+      const { start: startM, end: endM } = drawnSpanMins(ev);
       const top    = (startM / 60) * HOUR_H;
       const height = Math.max(((endM - startM) / 60) * HOUR_H - 2, 18);
       const w = `${90 / nCols}%`;
@@ -2315,7 +2341,7 @@ function findConflictsFor(data, excludeIds = new Set()) {
   let attendees = [];
   try { attendees = JSON.parse(data.attendee_ids || "[]"); } catch { /* no attendees */ }
   if (!attendees.length) return [];
-  const pool = eventsForRange(data.start_date, data.end_date || data.start_date, { filtered: false });
+  const pool = eventsForRange(data.start_date, data.end_date || data.start_date, { filtered: false, spread: false });
   return findMemberConflicts(data, attendees, pool, excludeIds);
 }
 

@@ -89,6 +89,113 @@ export function normalizeTime(iso) {
   return `${h}:${m}`;
 }
 
+/**
+ * An absolute instant — a timestamp that names its own offset (`Z`, `+02:00`).
+ * A string without one is a floating wall-clock time, already on the
+ * household's calendar, and must be read as written.
+ */
+const INSTANT_RE = /T.*(?:[zZ]|[+-]\d{2}:?\d{2})$/;
+
+/**
+ * One formatter per zone, kept: building an Intl.DateTimeFormat is the
+ * expensive half of a conversion, and a calendar converts every synced event
+ * it loads. "" is the device's zone, and what an unusable zone resolves to.
+ */
+const zoneFormatters = new Map();
+function zoneFormatter(timeZone) {
+  const key = typeof timeZone === "string" ? timeZone : "";
+  let formatter = zoneFormatters.get(key);
+  if (!formatter) {
+    const fields = { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" };
+    try {
+      formatter = new Intl.DateTimeFormat("en-US", key ? { ...fields, timeZone: key } : fields);
+    } catch {
+      formatter = zoneFormatter("");
+    }
+    zoneFormatters.set(key, formatter);
+  }
+  return formatter;
+}
+
+/**
+ * The household-calendar date and wall-clock time of an instant, or null when
+ * `iso` is not one.
+ *
+ * `normalizeDate`/`normalizeTime` cut the digits out of the string, which is
+ * right for a floating time and wrong for an instant: a 2 pm event in Denver
+ * is stored as 20:00Z and was drawn at 8 pm, and an evening one landed on the
+ * next day. `timeZone` is the household's (`hubTimeZone()`); without one the
+ * device's zone stands in, as it does for `hubToday()`.
+ */
+export function zonedDateTime(iso, timeZone) {
+  if (typeof iso !== "string" || !INSTANT_RE.test(iso)) return null;
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return null;
+  let year = "", month = "", day = "", hour = "", minute = "";
+  for (const part of zoneFormatter(timeZone).formatToParts(at)) {
+    if (part.type === "year") year = part.value;
+    else if (part.type === "month") month = part.value;
+    else if (part.type === "day") day = part.value;
+    else if (part.type === "hour") hour = part.value;
+    else if (part.type === "minute") minute = part.value;
+  }
+  return { date: `${year}-${month}-${day}`, time: `${hour}:${minute}` };
+}
+
+/**
+ * The last day an all-day event covers.
+ *
+ * A synced all-day event is date-anchored — midnight UTC, whatever the zone —
+ * and its end is EXCLUSIVE: one day runs from the 4th to the 5th. Read as an
+ * ordinary end date it would cover two.
+ */
+export function allDayEndDate(startIso, endIso, fallback = todayStr()) {
+  const start = normalizeDate(startIso, fallback);
+  if (typeof endIso !== "string" || !INSTANT_RE.test(endIso)) return normalizeDate(endIso, start);
+  const end = new Date(endIso);
+  if (Number.isNaN(end.getTime())) return start;
+  const last = new Date(end.getTime() - 1).toISOString().slice(0, 10);
+  return last < start ? start : last;
+}
+
+/** The last day an expanded event covers. A timed event that ends at midnight
+ *  ends WITH the day before: 22:00 to 00:00 is one evening, not two days. */
+function lastDayCovered(ev, first) {
+  const end = typeof ev.end_date === "string" && ev.end_date ? ev.end_date : first;
+  if (!ev.all_day && end > first && /^00:00(:00)?$/.test(ev.end_time ?? "")) return addDayStr(end, -1);
+  return end;
+}
+
+/**
+ * Put every event on every day it covers.
+ *
+ * The views group by `_date`, and an expanded event carries only the day it
+ * STARTS on — so a trip from the 3rd to the 6th was drawn on the 3rd alone,
+ * and nowhere at all once the 3rd was off screen. Each later day inside the
+ * range gets an entry of its own, marked `_continued` and shown as ALL-DAY:
+ * the start time belongs to the first day only, and an all-day entry is one
+ * no view offers to drag, so a continuation cannot be mistaken for the event's
+ * start and moved. An entry whose own day is outside the range is dropped.
+ *
+ * The copies share the event's id, `_primaryId` and `_occDate`, so opening one
+ * opens the event.
+ */
+export function spreadAcrossDays(events, rangeStart, rangeEnd) {
+  const out = [];
+  for (const ev of events) {
+    const first = ev._date ?? ev.start_date;
+    if (typeof first !== "string" || !first) { out.push(ev); continue; }
+    if (first >= rangeStart && first <= rangeEnd) out.push(ev);
+    const last = lastDayCovered(ev, first);
+    if (!(last > first)) continue;
+    const stop = last < rangeEnd ? last : rangeEnd;
+    for (let day = first < rangeStart ? rangeStart : addDayStr(first, 1); day <= stop; day = addDayStr(day, 1)) {
+      out.push({ ...ev, _date: day, _continued: true, all_day: 1 });
+    }
+  }
+  return out;
+}
+
 // ── Recurrence ────────────────────────────────────────────────────────────────
 
 export function describeRecurrence(rule) {
@@ -249,6 +356,22 @@ export function eventSpanMins(ev) {
   const start = timeToMins(ev.start_time) ?? 0;
   const end = timeToMins(ev.end_time);
   return { start, end: end === null ? start + DEFAULT_DURATION_MINS : end };
+}
+
+/**
+ * The span an event's box is DRAWN with on the day it starts.
+ *
+ * `eventSpanMins` reads `end_time` as a time on the same day, which it is not
+ * for an event that runs past it: 14:00 on the 4th to 11:00 on the 6th came
+ * out as a span that ends before it starts, and was drawn as a stub. On its
+ * first day such an event runs to midnight; the days after are entries of
+ * their own (`spreadAcrossDays`). Only the drawing is clipped — the event's
+ * own fields are what the detail view and the form read.
+ */
+export function drawnSpanMins(ev) {
+  const span = eventSpanMins(ev);
+  const runsOn = typeof ev.start_date === "string" && typeof ev.end_date === "string" && ev.end_date > ev.start_date;
+  return runsOn ? { start: span.start, end: 24 * 60 } : span;
 }
 
 /**
