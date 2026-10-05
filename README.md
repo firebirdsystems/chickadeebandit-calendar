@@ -2,14 +2,14 @@
 
 A [Chickadee Bandit](https://chickadeebandit.com/app-library/calendar) app.
 
-Family calendar with manual event creation, recurring events, and series editing. Shows month and agenda views. Merges in events synced from Google Calendar and Apple Calendar.
+Family calendar with manual event creation, recurring events, and series editing. Shows month and agenda views. Merges in events synced from Google Calendar, Apple Calendar, and Outlook.
 
 ## Features
 
 - Month and agenda views
 - Create, edit, and delete events
 - Recurring events with series editing (this event / all future / all)
-- Merges external events from Google Calendar and Apple Calendar sync
+- Merges external events from Google Calendar, Apple Calendar, and Outlook sync
 
 ## Install
 
