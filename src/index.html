@@ -468,7 +468,7 @@
 </div>
 
 <script type="module">
-import { memberColor, initial, esc, isAdult, hubConfirm, searchMatch, hubToday, hubTimeZone, readContext } from "/hub-sdk.js";
+import { memberColor, initial, esc, isAdult, hubConfirm, searchMatch, hubToday, hubTimeZone, readContext, glyph } from "/hub-sdk.js";
 import {
   MONTHS, MONTHS_SHORT, DAYS_SHORT, DAYS_ABBR, DAY_NAMES, EVENT_COLORS,
   p2, toDateStr, parseLD, addDaysObj, addDayStr, todayStr, daysBetween, getWeekStart,
@@ -856,7 +856,7 @@ function renderMemberBar() {
     `<button class="member-chip${memberFilter.has(m.id) ? " selected" : ""}" data-testid="member-chip" data-member-id="${m.id}" onclick="_toggleMemberFilter(${i})" title="Show ${esc(m.name)}'s events">
       <span class="attendee-av" style="background:${memberColor(m.id, members)}">${initial(m.name)}</span>${esc(m.name)}</button>`
   ).join("") + (memberFilter.size
-    ? `<button class="member-chip clear" data-testid="member-filter-clear" onclick="_clearMemberFilter()">✕ Show all</button>` : "");
+    ? `<button class="member-chip clear" data-testid="member-filter-clear" onclick="_clearMemberFilter()">${glyph("close")} Show all</button>` : "");
 }
 window._toggleMemberFilter = (i) => {
   const id = members[i]?.id;
@@ -2192,7 +2192,7 @@ function openDayPanel(dateStr) {
   panelEl.innerHTML = `<div class="day-panel" data-testid="day-panel" data-date="${dateStr}">
     <div class="day-panel-header">
       <div class="day-panel-title" data-testid="day-panel-title">${isToday ? "Today — " : ""}${dLabel}</div>
-      <button class="btn btn-ghost btn-sm" data-testid="day-panel-close" onclick="closePanels()">✕</button>
+      <button class="btn btn-ghost btn-sm" data-testid="day-panel-close" onclick="closePanels()" aria-label="Close">${glyph("close")}</button>
     </div>
     ${busyHtml}
     ${evRows}
@@ -2231,13 +2231,13 @@ function showEvent(evId, dateStr, primaryId, occDate) {
       <h3 style="display:flex;align-items:center;gap:8px" data-testid="event-detail-title">
         <span class="ev-detail-color" style="background:${esc(ev.color)}"></span>${esc(ev.title)}
       </h3>
-      <button class="btn btn-ghost btn-sm" data-testid="event-detail-close" onclick="closeModal()">✕</button>
+      <button class="btn btn-ghost btn-sm" data-testid="event-detail-close" onclick="closeModal()" aria-label="Close">${glyph("close")}</button>
     </div>
-    <div class="ev-detail-row"><div class="ev-detail-icon">📅</div><div class="ev-detail-val">${dateRange}${timeStr ? " · " + timeStr : ""}</div></div>
-    ${ev.location ? `<div class="ev-detail-row"><div class="ev-detail-icon">📍</div><div class="ev-detail-val">${esc(ev.location)}</div></div>` : ""}
-    ${ruleLabel ? `<div class="ev-detail-row"><div class="ev-detail-icon">🔁</div><div class="ev-detail-val"><span class="recurrence-badge">${ruleLabel}</span></div></div>` : ""}
-    ${attHtml ? `<div class="ev-detail-row"><div class="ev-detail-icon">👥</div><div class="ev-detail-val">${attHtml}</div></div>` : ""}
-    ${ev.description ? `<div class="ev-detail-row"><div class="ev-detail-icon">📝</div><div class="ev-detail-val" style="color:var(--muted)">${esc(ev.description)}</div></div>` : ""}
+    <div class="ev-detail-row"><div class="ev-detail-icon">${glyph("calendar")}</div><div class="ev-detail-val">${dateRange}${timeStr ? " · " + timeStr : ""}</div></div>
+    ${ev.location ? `<div class="ev-detail-row"><div class="ev-detail-icon">${glyph("location")}</div><div class="ev-detail-val">${esc(ev.location)}</div></div>` : ""}
+    ${ruleLabel ? `<div class="ev-detail-row"><div class="ev-detail-icon">${glyph("repeat")}</div><div class="ev-detail-val"><span class="recurrence-badge">${ruleLabel}</span></div></div>` : ""}
+    ${attHtml ? `<div class="ev-detail-row"><div class="ev-detail-icon">${glyph("people")}</div><div class="ev-detail-val">${attHtml}</div></div>` : ""}
+    ${ev.description ? `<div class="ev-detail-row"><div class="ev-detail-icon">${glyph("note")}</div><div class="ev-detail-val" style="color:var(--muted)">${esc(ev.description)}</div></div>` : ""}
     ${ev.calendar_name ? `<div style="font-size:.75rem;color:var(--muted);margin-top:4px">From: ${esc(ev.calendar_name)}</div>` : ""}
     ${ev.source === "synced" ? `<div style="font-size:.75rem;color:var(--muted);margin-top:4px">Synced from external calendar — editing not available here.</div>` : ""}
     ${ev.source === "cross-app" && ev.source_label ? `<div style="font-size:.75rem;color:var(--muted);margin-top:4px">From ${esc(ev.source_label)} — manage it there.</div>` : ""}
@@ -2374,7 +2374,7 @@ function warnConflicts(data, excludeIds = new Set()) {
     box.dataset.testid = "conflict-warning";
     modalEl?.querySelector(".modal-actions")?.before(box);
   }
-  box.innerHTML = `⚠️ <strong>Schedule conflict</strong><ul>${items}${extra}</ul>`;
+  box.innerHTML = `${glyph("warning")} <strong>Schedule conflict</strong><ul>${items}${extra}</ul>`;
   const btn = modalEl?.querySelector(".modal-actions .btn-primary");
   if (btn && !btn.textContent.endsWith("anyway")) btn.textContent += " anyway";
   conflictAck = true;
@@ -2411,7 +2411,7 @@ function collectFormData() {
   };
 }
 function openCreateModal(defaultDate = null) {
-  openModal(`<div class="modal-header"><h3>New Event</h3><button class="btn btn-ghost btn-sm" data-testid="modal-close" onclick="closeModal()">✕</button></div>
+  openModal(`<div class="modal-header"><h3>New Event</h3><button class="btn btn-ghost btn-sm" data-testid="modal-close" onclick="closeModal()" aria-label="Close">${glyph("close")}</button></div>
     ${buildEventForm({}, { defaultDate })}
     <div class="modal-actions">
       <button class="btn btn-ghost" data-testid="modal-cancel" onclick="closeModal()">Cancel</button>
@@ -2479,7 +2479,7 @@ function openDirectEdit(ev, scope, occDate) {
   // series' every time they edited the occurrence twice.
   const override = findOverride(primary.id, occDate);
   const editTarget = editTargetFor({ primary, override, scope, occDate });
-  openModal(`<div class="modal-header"><h3>Edit Event</h3><button class="btn btn-ghost btn-sm" data-testid="modal-close" onclick="closeModal()">✕</button></div>
+  openModal(`<div class="modal-header"><h3>Edit Event</h3><button class="btn btn-ghost btn-sm" data-testid="modal-close" onclick="closeModal()" aria-label="Close">${glyph("close")}</button></div>
     ${buildEventForm(editTarget)}
     <div class="modal-actions">
       <button class="btn btn-ghost" data-testid="modal-cancel" onclick="closeModal()">Cancel</button>
@@ -2740,19 +2740,19 @@ function openScopeModal(action, primaryId, occDate, dropKey = null) {
     : action === "edit" ? `closeModal();openDirectEdit_('${primaryId}','${scope}','${occDate}')`
     :                     `closeModal();deleteEvent('${primaryId}','${occDate}','${scope}','${delPrimary?.updated_at ?? ""}','${delOverride?.updated_at ?? ""}')`;
   const scopeOpts = [
-    { scope: "this",      icon: "📌", label: "This event",               desc: `Only ${fmtDateShort(occDate)}` },
-    { scope: "following", icon: "➡️", label: "This and following events", desc: `From ${fmtDateShort(occDate)} onwards` },
-    { scope: "all",       icon: "🔁", label: "All events",               desc: `Every occurrence in the series` },
+    { scope: "this",      glyph: "pin", label: "This event",               desc: `Only ${fmtDateShort(occDate)}` },
+    { scope: "following", glyph: "arrow-right", label: "This and following events", desc: `From ${fmtDateShort(occDate)} onwards` },
+    { scope: "all",       glyph: "repeat", label: "All events",               desc: `Every occurrence in the series` },
   ];
   openModal(`
     <div class="modal-header">
       <h3>${heading}</h3>
-      <button class="btn btn-ghost btn-sm" data-testid="modal-close" onclick="closeModal()">✕</button>
+      <button class="btn btn-ghost btn-sm" data-testid="modal-close" onclick="closeModal()" aria-label="Close">${glyph("close")}</button>
     </div>
     <p style="font-size:.85rem;color:var(--muted);margin-bottom:14px">Which events do you want to ${verb}?</p>
     ${scopeOpts.map(o => `
       <div class="scope-option" data-testid="scope-option" data-scope="${o.scope}" onclick="${pick(o.scope)}">
-        <span class="scope-icon">${o.icon}</span>
+        <span class="scope-icon">${glyph(o.glyph)}</span>
         <div><div class="scope-label">${o.label}</div><div class="scope-desc">${o.desc}</div></div>
       </div>`).join("")}
     <div class="modal-actions"><button class="btn btn-ghost" data-testid="modal-cancel" onclick="closeModal()">Cancel</button></div>`, "event-scope-modal");
