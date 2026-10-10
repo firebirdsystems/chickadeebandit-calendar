@@ -229,7 +229,8 @@
   },
   "storage": "db",
   "preload": {
-    "events": {"sql": "SELECT * FROM app_calendar__events WHERE source = 'local' ORDER BY start_date, start_time"}
+    "events": {"sql": "SELECT * FROM app_calendar__events WHERE source = 'local' ORDER BY start_date, start_time"},
+    "hidden_synced": {"sql": "SELECT event_id FROM app_calendar__hidden_synced_events"}
   },
   "capture_consumer": { "kinds": ["event"], "via": "structured" },
   "nav": {

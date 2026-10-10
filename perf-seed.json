@@ -1,0 +1,2410 @@
+{
+  "seed": [
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, recurrence, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-85 days','+0 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-80 days','+0 minutes'), ?)",
+      "params": [
+        "perf-cal-r1",
+        "Soccer practice",
+        "Riverside Park, field 3",
+        "{{date:-70}}",
+        "16:30",
+        "{{date:-70}}",
+        "18:00",
+        0,
+        "#16a34a",
+        "{{partner}}",
+        "{\"freq\":\"weekly\",\"interval\":1,\"end_type\":\"never\"}",
+        0,
+        "{{partner}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, recurrence, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-83 days','+1 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-78 days','+1 minutes'), ?)",
+      "params": [
+        "perf-cal-r2",
+        "Piano lesson",
+        "Ms. Novak's studio",
+        "{{date:-68}}",
+        "15:45",
+        "{{date:-68}}",
+        "16:30",
+        0,
+        "#7c3aed",
+        "{{me}}",
+        "{\"freq\":\"weekly\",\"interval\":1,\"end_type\":\"never\"}",
+        0,
+        "{{me}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, start_date, end_date, all_day, color, organizer_id, recurrence, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-105 days','+2 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-100 days','+2 minutes'), ?)",
+      "params": [
+        "perf-cal-r3",
+        "Trash and recycling out",
+        "{{date:-90}}",
+        "{{date:-90}}",
+        1,
+        "#d97706",
+        "{{me}}",
+        "{\"freq\":\"weekly\",\"interval\":1,\"end_type\":\"never\"}",
+        0,
+        "{{me}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, start_date, start_time, end_date, end_time, all_day, color, organizer_id, recurrence, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-75 days','+3 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-70 days','+3 minutes'), ?)",
+      "params": [
+        "perf-cal-r4",
+        "Date night",
+        "{{date:-60}}",
+        "19:00",
+        "{{date:-60}}",
+        "22:00",
+        0,
+        "#db2777",
+        "{{me}}",
+        "{\"freq\":\"weekly\",\"interval\":2,\"end_type\":\"never\"}",
+        0,
+        "{{me}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, start_date, end_date, all_day, color, organizer_id, recurrence, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-100 days','+4 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-95 days','+4 minutes'), ?)",
+      "params": [
+        "perf-cal-r5",
+        "Mortgage payment",
+        "{{date:-85}}",
+        "{{date:-85}}",
+        1,
+        "#dc2626",
+        "{{partner}}",
+        "{\"freq\":\"monthly\",\"interval\":1,\"end_type\":\"never\"}",
+        0,
+        "{{partner}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, recurrence, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-65 days','+5 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-60 days','+5 minutes'), ?)",
+      "params": [
+        "perf-cal-r6",
+        "Book club",
+        "Okafor house",
+        "{{date:-50}}",
+        "19:30",
+        "{{date:-50}}",
+        "21:00",
+        0,
+        "#4f46e5",
+        "{{adult2}}",
+        "{\"freq\":\"monthly\",\"interval\":1,\"end_type\":\"count\",\"count\":12}",
+        0,
+        "{{adult2}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, start_date, end_date, all_day, color, organizer_id, recurrence, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-355 days','+6 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-350 days','+6 minutes'), ?)",
+      "params": [
+        "perf-cal-r7",
+        "Grandma's birthday",
+        "{{date:-340}}",
+        "{{date:-340}}",
+        1,
+        "#db2777",
+        "{{me}}",
+        "{\"freq\":\"yearly\",\"interval\":1,\"end_type\":\"never\"}",
+        0,
+        "{{me}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, recurrence, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-18 days','+7 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-13 days','+7 minutes'), ?)",
+      "params": [
+        "perf-cal-r8",
+        "Swim team morning practice",
+        "Aquatic center",
+        "{{date:-3}}",
+        "06:15",
+        "{{date:-3}}",
+        "07:15",
+        0,
+        "#0891b2",
+        "{{partner}}",
+        "{\"freq\":\"daily\",\"interval\":1,\"end_type\":\"count\",\"count\":10}",
+        0,
+        "{{partner}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, description, start_date, start_time, end_date, end_time, all_day, color, organizer_id, recurrence, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-78 days','+8 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-73 days','+8 minutes'), ?)",
+      "params": [
+        "perf-cal-r9",
+        "Family council",
+        "Agenda items go in the Agenda app by Saturday.",
+        "{{date:-63}}",
+        "18:30",
+        "{{date:-63}}",
+        "19:15",
+        0,
+        "#0f766e",
+        "{{me}}",
+        "{\"freq\":\"weekly\",\"interval\":1,\"end_type\":\"never\"}",
+        0,
+        "{{me}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, recurring_event_id, original_date, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-10 days','+0 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-10 days','+0 minutes'), ?)",
+      "params": [
+        "perf-cal-x1",
+        "Soccer practice (moved indoors)",
+        "Rec center gym",
+        "{{date:0}}",
+        "17:00",
+        "{{date:0}}",
+        "18:30",
+        0,
+        "#16a34a",
+        "{{partner}}",
+        "perf-cal-r1",
+        "{{date:0}}",
+        0,
+        "{{partner}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, recurring_event_id, original_date, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-8 days','+0 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-8 days','+0 minutes'), ?)",
+      "params": [
+        "perf-cal-x2",
+        "Piano lesson",
+        "Ms. Novak's studio",
+        "{{date:2}}",
+        "15:45",
+        "{{date:2}}",
+        "16:30",
+        0,
+        "#7c3aed",
+        "{{me}}",
+        "perf-cal-r2",
+        "{{date:2}}",
+        1,
+        "{{me}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, recurring_event_id, original_date, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-24 days','+0 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-24 days','+0 minutes'), ?)",
+      "params": [
+        "perf-cal-x3",
+        "Soccer practice",
+        "Riverside Park, field 3",
+        "{{date:-14}}",
+        "16:30",
+        "{{date:-14}}",
+        "18:00",
+        0,
+        "#16a34a",
+        "{{partner}}",
+        "perf-cal-r1",
+        "{{date:-14}}",
+        1,
+        "{{partner}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, start_date, start_time, end_date, end_time, all_day, color, organizer_id, recurring_event_id, original_date, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-3 days','+0 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-3 days','+0 minutes'), ?)",
+      "params": [
+        "perf-cal-x4",
+        "Family council: budget special",
+        "{{date:7}}",
+        "18:00",
+        "{{date:7}}",
+        "19:30",
+        0,
+        "#0f766e",
+        "{{me}}",
+        "perf-cal-r9",
+        "{{date:7}}",
+        0,
+        "{{me}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-86 days','+1 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-86 days','+1 minutes'), ?)",
+      "params": [
+        "perf-cal-001",
+        "Parent-teacher conference",
+        "Room 12",
+        "{{date:-76}}",
+        "14:15",
+        "{{date:-76}}",
+        "14:30",
+        0,
+        "#4f46e5",
+        "{{partner}}",
+        0,
+        "{{partner}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-84 days','+2 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-84 days','+2 minutes'), ?)",
+      "params": [
+        "perf-cal-002",
+        "Pediatrician checkup",
+        "Northwind Health",
+        "{{date:-74}}",
+        "11:00",
+        "{{date:-74}}",
+        "11:45",
+        0,
+        "#0891b2",
+        "{{me}}",
+        0,
+        "{{me}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-83 days','+3 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-83 days','+3 minutes'), ?)",
+      "params": [
+        "perf-cal-003",
+        "Dinner with the Okafors",
+        "Their place",
+        "{{date:-73}}",
+        "18:30",
+        "{{date:-73}}",
+        "21:00",
+        0,
+        "#16a34a",
+        "{{adult2}}",
+        0,
+        "{{adult2}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, description, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-81 days','+4 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-81 days','+4 minutes'), ?)",
+      "params": [
+        "perf-cal-004",
+        "Oil change",
+        "Bring the insurance card and arrive ten minutes early.",
+        "Summit Auto",
+        "{{date:-71}}",
+        "08:00",
+        "{{date:-71}}",
+        "09:00",
+        0,
+        "#d97706",
+        "{{child}}",
+        0,
+        "{{child}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, start_date, end_date, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-80 days','+5 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-80 days','+5 minutes'), ?)",
+      "params": [
+        "perf-cal-005",
+        "Library books due",
+        "{{date:-70}}",
+        "{{date:-70}}",
+        1,
+        "#dc2626",
+        "{{me}}",
+        0,
+        "{{me}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-80 days','+6 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-80 days','+6 minutes'), ?)",
+      "params": [
+        "perf-cal-006",
+        "Haircuts",
+        "Main Street Barbers",
+        "{{date:-70}}",
+        "16:00",
+        "{{date:-70}}",
+        "17:00",
+        0,
+        "#7c3aed",
+        "{{partner}}",
+        0,
+        "{{partner}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-78 days','+7 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-78 days','+7 minutes'), ?)",
+      "params": [
+        "perf-cal-007",
+        "Vet: annual shots",
+        "Cedar Ridge Vet",
+        "{{date:-68}}",
+        "10:30",
+        "{{date:-68}}",
+        "11:15",
+        0,
+        "#db2777",
+        "{{child2}}",
+        0,
+        "{{child2}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, description, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-77 days','+8 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-77 days','+8 minutes'), ?)",
+      "params": [
+        "perf-cal-008",
+        "Soccer game",
+        "Bring the insurance card and arrive ten minutes early.",
+        "Riverside Park",
+        "{{date:-67}}",
+        "10:00",
+        "{{date:-67}}",
+        "11:30",
+        0,
+        "#0f766e",
+        "{{me}}",
+        0,
+        "{{me}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-75 days','+9 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-75 days','+9 minutes'), ?)",
+      "params": [
+        "perf-cal-009",
+        "Birthday party",
+        "Jump Zone",
+        "{{date:-65}}",
+        "13:00",
+        "{{date:-65}}",
+        "15:00",
+        0,
+        "#4f46e5",
+        "{{partner}}",
+        0,
+        "{{partner}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, start_date, end_date, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-75 days','+10 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-75 days','+10 minutes'), ?)",
+      "params": [
+        "perf-cal-010",
+        "Car registration due",
+        "{{date:-65}}",
+        "{{date:-65}}",
+        1,
+        "#0891b2",
+        "{{me}}",
+        0,
+        "{{me}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-74 days','+11 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-74 days','+11 minutes'), ?)",
+      "params": [
+        "perf-cal-011",
+        "Plumber visit",
+        "{{date:-64}}",
+        "12:00",
+        "{{date:-64}}",
+        "14:00",
+        0,
+        "#16a34a",
+        "{{adult2}}",
+        0,
+        "{{adult2}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, description, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-72 days','+12 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-72 days','+12 minutes'), ?)",
+      "params": [
+        "perf-cal-012",
+        "Science fair",
+        "Bring the insurance card and arrive ten minutes early.",
+        "School gym",
+        "{{date:-62}}",
+        "17:30",
+        "{{date:-62}}",
+        "19:30",
+        0,
+        "#d97706",
+        "{{child}}",
+        0,
+        "{{child}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-71 days','+13 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-71 days','+13 minutes'), ?)",
+      "params": [
+        "perf-cal-013",
+        "Orthodontist",
+        "Brightline Ortho",
+        "{{date:-61}}",
+        "15:15",
+        "{{date:-61}}",
+        "16:00",
+        0,
+        "#dc2626",
+        "{{me}}",
+        0,
+        "{{me}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-69 days','+14 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-69 days','+14 minutes'), ?)",
+      "params": [
+        "perf-cal-014",
+        "Dentist: cleaning",
+        "Lakeside Dental",
+        "{{date:-59}}",
+        "09:00",
+        "{{date:-59}}",
+        "10:00",
+        0,
+        "#7c3aed",
+        "{{partner}}",
+        0,
+        "{{partner}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, start_date, end_date, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-68 days','+15 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-68 days','+15 minutes'), ?)",
+      "params": [
+        "perf-cal-015",
+        "Picture day",
+        "{{date:-58}}",
+        "{{date:-58}}",
+        1,
+        "#db2777",
+        "{{child2}}",
+        0,
+        "{{child2}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, description, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-66 days','+16 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-66 days','+16 minutes'), ?)",
+      "params": [
+        "perf-cal-016",
+        "Pediatrician checkup",
+        "Bring the insurance card and arrive ten minutes early.",
+        "Northwind Health",
+        "{{date:-56}}",
+        "11:00",
+        "{{date:-56}}",
+        "11:45",
+        0,
+        "#0f766e",
+        "{{me}}",
+        0,
+        "{{me}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-65 days','+17 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-65 days','+17 minutes'), ?)",
+      "params": [
+        "perf-cal-017",
+        "Dinner with the Okafors",
+        "Their place",
+        "{{date:-55}}",
+        "18:30",
+        "{{date:-55}}",
+        "21:00",
+        0,
+        "#4f46e5",
+        "{{partner}}",
+        0,
+        "{{partner}}",
+        "private"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-65 days','+18 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-65 days','+18 minutes'), ?)",
+      "params": [
+        "perf-cal-018",
+        "Oil change",
+        "Summit Auto",
+        "{{date:-55}}",
+        "08:00",
+        "{{date:-55}}",
+        "09:00",
+        0,
+        "#0891b2",
+        "{{me}}",
+        0,
+        "{{me}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-63 days','+19 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-63 days','+19 minutes'), ?)",
+      "params": [
+        "perf-cal-019",
+        "School concert",
+        "Auditorium",
+        "{{date:-53}}",
+        "19:00",
+        "{{date:-53}}",
+        "20:30",
+        0,
+        "#16a34a",
+        "{{adult2}}",
+        0,
+        "{{adult2}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, start_date, end_date, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-62 days','+20 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-62 days','+20 minutes'), ?)",
+      "params": [
+        "perf-cal-020",
+        "Grandma visiting",
+        "{{date:-52}}",
+        "{{date:-49}}",
+        1,
+        "#d97706",
+        "{{child}}",
+        0,
+        "{{child}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-60 days','+21 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-60 days','+21 minutes'), ?)",
+      "params": [
+        "perf-cal-021",
+        "Vet: annual shots",
+        "Cedar Ridge Vet",
+        "{{date:-50}}",
+        "10:30",
+        "{{date:-50}}",
+        "11:15",
+        0,
+        "#dc2626",
+        "{{me}}",
+        0,
+        "{{me}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-60 days','+22 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-60 days','+22 minutes'), ?)",
+      "params": [
+        "perf-cal-022",
+        "Soccer game",
+        "Riverside Park",
+        "{{date:-50}}",
+        "10:00",
+        "{{date:-50}}",
+        "11:30",
+        0,
+        "#7c3aed",
+        "{{partner}}",
+        0,
+        "{{partner}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-59 days','+23 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-59 days','+23 minutes'), ?)",
+      "params": [
+        "perf-cal-023",
+        "Birthday party",
+        "Jump Zone",
+        "{{date:-49}}",
+        "13:00",
+        "{{date:-49}}",
+        "15:00",
+        0,
+        "#db2777",
+        "{{child2}}",
+        0,
+        "{{child2}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, description, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-57 days','+24 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-57 days','+24 minutes'), ?)",
+      "params": [
+        "perf-cal-024",
+        "Work dinner",
+        "Bring the insurance card and arrive ten minutes early.",
+        "Downtown",
+        "{{date:-47}}",
+        "18:00",
+        "{{date:-47}}",
+        "20:00",
+        0,
+        "#0f766e",
+        "{{me}}",
+        0,
+        "{{me}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, start_date, end_date, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-56 days','+25 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-56 days','+25 minutes'), ?)",
+      "params": [
+        "perf-cal-025",
+        "Camping trip",
+        "{{date:-46}}",
+        "{{date:-44}}",
+        1,
+        "#4f46e5",
+        "{{partner}}",
+        0,
+        "{{partner}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-54 days','+26 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-54 days','+26 minutes'), ?)",
+      "params": [
+        "perf-cal-026",
+        "Science fair",
+        "School gym",
+        "{{date:-44}}",
+        "17:30",
+        "{{date:-44}}",
+        "19:30",
+        0,
+        "#0891b2",
+        "{{me}}",
+        0,
+        "{{me}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-53 days','+27 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-53 days','+27 minutes'), ?)",
+      "params": [
+        "perf-cal-027",
+        "Orthodontist",
+        "Brightline Ortho",
+        "{{date:-43}}",
+        "15:15",
+        "{{date:-43}}",
+        "16:00",
+        0,
+        "#16a34a",
+        "{{adult2}}",
+        0,
+        "{{adult2}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, description, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-51 days','+28 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-51 days','+28 minutes'), ?)",
+      "params": [
+        "perf-cal-028",
+        "Dentist: cleaning",
+        "Bring the insurance card and arrive ten minutes early.",
+        "Lakeside Dental",
+        "{{date:-41}}",
+        "09:00",
+        "{{date:-41}}",
+        "10:00",
+        0,
+        "#d97706",
+        "{{child}}",
+        0,
+        "{{child}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-50 days','+29 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-50 days','+29 minutes'), ?)",
+      "params": [
+        "perf-cal-029",
+        "Parent-teacher conference",
+        "Room 12",
+        "{{date:-40}}",
+        "14:15",
+        "{{date:-40}}",
+        "14:30",
+        0,
+        "#dc2626",
+        "{{me}}",
+        0,
+        "{{me}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, start_date, end_date, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-50 days','+30 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-50 days','+30 minutes'), ?)",
+      "params": [
+        "perf-cal-030",
+        "Field trip: science museum",
+        "{{date:-40}}",
+        "{{date:-40}}",
+        1,
+        "#7c3aed",
+        "{{partner}}",
+        0,
+        "{{partner}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-48 days','+31 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-48 days','+31 minutes'), ?)",
+      "params": [
+        "perf-cal-031",
+        "Dinner with the Okafors",
+        "Their place",
+        "{{date:-38}}",
+        "18:30",
+        "{{date:-38}}",
+        "21:00",
+        0,
+        "#db2777",
+        "{{child2}}",
+        0,
+        "{{child2}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, description, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-47 days','+32 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-47 days','+32 minutes'), ?)",
+      "params": [
+        "perf-cal-032",
+        "Oil change",
+        "Bring the insurance card and arrive ten minutes early.",
+        "Summit Auto",
+        "{{date:-37}}",
+        "08:00",
+        "{{date:-37}}",
+        "09:00",
+        0,
+        "#0f766e",
+        "{{me}}",
+        0,
+        "{{me}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-45 days','+33 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-45 days','+33 minutes'), ?)",
+      "params": [
+        "perf-cal-033",
+        "School concert",
+        "Auditorium",
+        "{{date:-35}}",
+        "19:00",
+        "{{date:-35}}",
+        "20:30",
+        0,
+        "#4f46e5",
+        "{{partner}}",
+        0,
+        "{{partner}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-45 days','+34 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-45 days','+34 minutes'), ?)",
+      "params": [
+        "perf-cal-034",
+        "Haircuts",
+        "Main Street Barbers",
+        "{{date:-35}}",
+        "16:00",
+        "{{date:-35}}",
+        "17:00",
+        0,
+        "#0891b2",
+        "{{me}}",
+        0,
+        "{{me}}",
+        "private"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, start_date, end_date, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-44 days','+35 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-44 days','+35 minutes'), ?)",
+      "params": [
+        "perf-cal-035",
+        "Recycling drop-off day",
+        "{{date:-34}}",
+        "{{date:-34}}",
+        1,
+        "#16a34a",
+        "{{adult2}}",
+        0,
+        "{{adult2}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, description, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-42 days','+36 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-42 days','+36 minutes'), ?)",
+      "params": [
+        "perf-cal-036",
+        "Soccer game",
+        "Bring the insurance card and arrive ten minutes early.",
+        "Riverside Park",
+        "{{date:-32}}",
+        "10:00",
+        "{{date:-32}}",
+        "11:30",
+        0,
+        "#d97706",
+        "{{child}}",
+        0,
+        "{{child}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-41 days','+37 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-41 days','+37 minutes'), ?)",
+      "params": [
+        "perf-cal-037",
+        "Birthday party",
+        "Jump Zone",
+        "{{date:-31}}",
+        "13:00",
+        "{{date:-31}}",
+        "15:00",
+        0,
+        "#dc2626",
+        "{{me}}",
+        0,
+        "{{me}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-39 days','+38 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-39 days','+38 minutes'), ?)",
+      "params": [
+        "perf-cal-038",
+        "Work dinner",
+        "Downtown",
+        "{{date:-29}}",
+        "18:00",
+        "{{date:-29}}",
+        "20:00",
+        0,
+        "#7c3aed",
+        "{{partner}}",
+        0,
+        "{{partner}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-38 days','+39 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-38 days','+39 minutes'), ?)",
+      "params": [
+        "perf-cal-039",
+        "Plumber visit",
+        "{{date:-28}}",
+        "12:00",
+        "{{date:-28}}",
+        "14:00",
+        0,
+        "#db2777",
+        "{{child2}}",
+        0,
+        "{{child2}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, start_date, end_date, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-36 days','+40 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-36 days','+40 minutes'), ?)",
+      "params": [
+        "perf-cal-040",
+        "Quarterly taxes due",
+        "{{date:-26}}",
+        "{{date:-26}}",
+        1,
+        "#0f766e",
+        "{{me}}",
+        0,
+        "{{me}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-35 days','+41 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-35 days','+41 minutes'), ?)",
+      "params": [
+        "perf-cal-041",
+        "Orthodontist",
+        "Brightline Ortho",
+        "{{date:-25}}",
+        "15:15",
+        "{{date:-25}}",
+        "16:00",
+        0,
+        "#4f46e5",
+        "{{partner}}",
+        0,
+        "{{partner}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-35 days','+42 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-35 days','+42 minutes'), ?)",
+      "params": [
+        "perf-cal-042",
+        "Dentist: cleaning",
+        "Lakeside Dental",
+        "{{date:-25}}",
+        "09:00",
+        "{{date:-25}}",
+        "10:00",
+        0,
+        "#0891b2",
+        "{{me}}",
+        0,
+        "{{me}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-33 days','+43 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-33 days','+43 minutes'), ?)",
+      "params": [
+        "perf-cal-043",
+        "Parent-teacher conference",
+        "Room 12",
+        "{{date:-23}}",
+        "14:15",
+        "{{date:-23}}",
+        "14:30",
+        0,
+        "#16a34a",
+        "{{adult2}}",
+        0,
+        "{{adult2}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, description, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-32 days','+44 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-32 days','+44 minutes'), ?)",
+      "params": [
+        "perf-cal-044",
+        "Pediatrician checkup",
+        "Bring the insurance card and arrive ten minutes early.",
+        "Northwind Health",
+        "{{date:-22}}",
+        "11:00",
+        "{{date:-22}}",
+        "11:45",
+        0,
+        "#d97706",
+        "{{child}}",
+        0,
+        "{{child}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, start_date, end_date, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-30 days','+45 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-30 days','+45 minutes'), ?)",
+      "params": [
+        "perf-cal-045",
+        "Cousins in town",
+        "{{date:-20}}",
+        "{{date:-16}}",
+        1,
+        "#dc2626",
+        "{{me}}",
+        0,
+        "{{me}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-30 days','+46 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-30 days','+46 minutes'), ?)",
+      "params": [
+        "perf-cal-046",
+        "Oil change",
+        "Summit Auto",
+        "{{date:-20}}",
+        "08:00",
+        "{{date:-20}}",
+        "09:00",
+        0,
+        "#7c3aed",
+        "{{partner}}",
+        0,
+        "{{partner}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-29 days','+47 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-29 days','+47 minutes'), ?)",
+      "params": [
+        "perf-cal-047",
+        "School concert",
+        "Auditorium",
+        "{{date:-19}}",
+        "19:00",
+        "{{date:-19}}",
+        "20:30",
+        0,
+        "#db2777",
+        "{{child2}}",
+        0,
+        "{{child2}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, description, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-27 days','+48 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-27 days','+48 minutes'), ?)",
+      "params": [
+        "perf-cal-048",
+        "Haircuts",
+        "Bring the insurance card and arrive ten minutes early.",
+        "Main Street Barbers",
+        "{{date:-17}}",
+        "16:00",
+        "{{date:-17}}",
+        "17:00",
+        0,
+        "#0f766e",
+        "{{me}}",
+        0,
+        "{{me}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-26 days','+49 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-26 days','+49 minutes'), ?)",
+      "params": [
+        "perf-cal-049",
+        "Vet: annual shots",
+        "Cedar Ridge Vet",
+        "{{date:-16}}",
+        "10:30",
+        "{{date:-16}}",
+        "11:15",
+        0,
+        "#4f46e5",
+        "{{partner}}",
+        0,
+        "{{partner}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, start_date, end_date, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-24 days','+50 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-24 days','+50 minutes'), ?)",
+      "params": [
+        "perf-cal-050",
+        "No school: teacher in-service",
+        "{{date:-14}}",
+        "{{date:-14}}",
+        1,
+        "#0891b2",
+        "{{me}}",
+        0,
+        "{{me}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-24 days','+51 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-24 days','+51 minutes'), ?)",
+      "params": [
+        "perf-cal-051",
+        "Birthday party",
+        "Jump Zone",
+        "{{date:-14}}",
+        "13:00",
+        "{{date:-14}}",
+        "15:00",
+        0,
+        "#16a34a",
+        "{{adult2}}",
+        0,
+        "{{adult2}}",
+        "private"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, description, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-23 days','+52 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-23 days','+52 minutes'), ?)",
+      "params": [
+        "perf-cal-052",
+        "Work dinner",
+        "Bring the insurance card and arrive ten minutes early.",
+        "Downtown",
+        "{{date:-13}}",
+        "18:00",
+        "{{date:-13}}",
+        "20:00",
+        0,
+        "#d97706",
+        "{{child}}",
+        0,
+        "{{child}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-22 days','+53 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-22 days','+53 minutes'), ?)",
+      "params": [
+        "perf-cal-053",
+        "Plumber visit",
+        "{{date:-12}}",
+        "12:00",
+        "{{date:-12}}",
+        "14:00",
+        0,
+        "#dc2626",
+        "{{me}}",
+        0,
+        "{{me}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-22 days','+54 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-22 days','+54 minutes'), ?)",
+      "params": [
+        "perf-cal-054",
+        "Science fair",
+        "School gym",
+        "{{date:-12}}",
+        "17:30",
+        "{{date:-12}}",
+        "19:30",
+        0,
+        "#7c3aed",
+        "{{partner}}",
+        0,
+        "{{partner}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, start_date, end_date, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-21 days','+55 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-21 days','+55 minutes'), ?)",
+      "params": [
+        "perf-cal-055",
+        "Library books due",
+        "{{date:-11}}",
+        "{{date:-11}}",
+        1,
+        "#db2777",
+        "{{child2}}",
+        0,
+        "{{child2}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, description, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-20 days','+56 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-20 days','+56 minutes'), ?)",
+      "params": [
+        "perf-cal-056",
+        "Dentist: cleaning",
+        "Bring the insurance card and arrive ten minutes early.",
+        "Lakeside Dental",
+        "{{date:-10}}",
+        "09:00",
+        "{{date:-10}}",
+        "10:00",
+        0,
+        "#0f766e",
+        "{{me}}",
+        0,
+        "{{me}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-20 days','+57 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-20 days','+57 minutes'), ?)",
+      "params": [
+        "perf-cal-057",
+        "Parent-teacher conference",
+        "Room 12",
+        "{{date:-10}}",
+        "14:15",
+        "{{date:-10}}",
+        "14:30",
+        0,
+        "#4f46e5",
+        "{{partner}}",
+        0,
+        "{{partner}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-19 days','+58 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-19 days','+58 minutes'), ?)",
+      "params": [
+        "perf-cal-058",
+        "Pediatrician checkup",
+        "Northwind Health",
+        "{{date:-9}}",
+        "11:00",
+        "{{date:-9}}",
+        "11:45",
+        0,
+        "#0891b2",
+        "{{me}}",
+        0,
+        "{{me}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-18 days','+59 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-18 days','+59 minutes'), ?)",
+      "params": [
+        "perf-cal-059",
+        "Dinner with the Okafors",
+        "Their place",
+        "{{date:-8}}",
+        "18:30",
+        "{{date:-8}}",
+        "21:00",
+        0,
+        "#16a34a",
+        "{{adult2}}",
+        0,
+        "{{adult2}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, start_date, end_date, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-18 days','+60 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-18 days','+60 minutes'), ?)",
+      "params": [
+        "perf-cal-060",
+        "Car registration due",
+        "{{date:-8}}",
+        "{{date:-8}}",
+        1,
+        "#d97706",
+        "{{child}}",
+        0,
+        "{{child}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-17 days','+61 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-17 days','+61 minutes'), ?)",
+      "params": [
+        "perf-cal-061",
+        "School concert",
+        "Auditorium",
+        "{{date:-7}}",
+        "19:00",
+        "{{date:-7}}",
+        "20:30",
+        0,
+        "#dc2626",
+        "{{me}}",
+        0,
+        "{{me}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-16 days','+62 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-16 days','+62 minutes'), ?)",
+      "params": [
+        "perf-cal-062",
+        "Haircuts",
+        "Main Street Barbers",
+        "{{date:-6}}",
+        "16:00",
+        "{{date:-6}}",
+        "17:00",
+        0,
+        "#7c3aed",
+        "{{partner}}",
+        0,
+        "{{partner}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-16 days','+63 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-16 days','+63 minutes'), ?)",
+      "params": [
+        "perf-cal-063",
+        "Vet: annual shots",
+        "Cedar Ridge Vet",
+        "{{date:-6}}",
+        "10:30",
+        "{{date:-6}}",
+        "11:15",
+        0,
+        "#db2777",
+        "{{child2}}",
+        0,
+        "{{child2}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, description, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-15 days','+64 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-15 days','+64 minutes'), ?)",
+      "params": [
+        "perf-cal-064",
+        "Soccer game",
+        "Bring the insurance card and arrive ten minutes early.",
+        "Riverside Park",
+        "{{date:-5}}",
+        "10:00",
+        "{{date:-5}}",
+        "11:30",
+        0,
+        "#0f766e",
+        "{{me}}",
+        0,
+        "{{me}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, start_date, end_date, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-14 days','+65 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-14 days','+65 minutes'), ?)",
+      "params": [
+        "perf-cal-065",
+        "Picture day",
+        "{{date:-4}}",
+        "{{date:-4}}",
+        1,
+        "#4f46e5",
+        "{{partner}}",
+        0,
+        "{{partner}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-14 days','+66 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-14 days','+66 minutes'), ?)",
+      "params": [
+        "perf-cal-066",
+        "Work dinner",
+        "Downtown",
+        "{{date:-4}}",
+        "18:00",
+        "{{date:-4}}",
+        "20:00",
+        0,
+        "#0891b2",
+        "{{me}}",
+        0,
+        "{{me}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-13 days','+67 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-13 days','+67 minutes'), ?)",
+      "params": [
+        "perf-cal-067",
+        "Plumber visit",
+        "{{date:-3}}",
+        "12:00",
+        "{{date:-3}}",
+        "14:00",
+        0,
+        "#16a34a",
+        "{{adult2}}",
+        0,
+        "{{adult2}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, description, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-12 days','+68 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-12 days','+68 minutes'), ?)",
+      "params": [
+        "perf-cal-068",
+        "Science fair",
+        "Bring the insurance card and arrive ten minutes early.",
+        "School gym",
+        "{{date:-2}}",
+        "17:30",
+        "{{date:-2}}",
+        "19:30",
+        0,
+        "#d97706",
+        "{{child}}",
+        0,
+        "{{child}}",
+        "private"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-12 days','+69 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-12 days','+69 minutes'), ?)",
+      "params": [
+        "perf-cal-069",
+        "Orthodontist",
+        "Brightline Ortho",
+        "{{date:-2}}",
+        "15:15",
+        "{{date:-2}}",
+        "16:00",
+        0,
+        "#dc2626",
+        "{{me}}",
+        0,
+        "{{me}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, start_date, end_date, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-11 days','+70 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-11 days','+70 minutes'), ?)",
+      "params": [
+        "perf-cal-070",
+        "Grandma visiting",
+        "{{date:-1}}",
+        "{{date:2}}",
+        1,
+        "#7c3aed",
+        "{{partner}}",
+        0,
+        "{{partner}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-10 days','+71 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-10 days','+71 minutes'), ?)",
+      "params": [
+        "perf-cal-071",
+        "Parent-teacher conference",
+        "Room 12",
+        "{{date:0}}",
+        "14:15",
+        "{{date:0}}",
+        "14:30",
+        0,
+        "#db2777",
+        "{{child2}}",
+        0,
+        "{{child2}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, description, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-10 days','+72 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-10 days','+72 minutes'), ?)",
+      "params": [
+        "perf-cal-072",
+        "Pediatrician checkup",
+        "Bring the insurance card and arrive ten minutes early.",
+        "Northwind Health",
+        "{{date:0}}",
+        "11:00",
+        "{{date:0}}",
+        "11:45",
+        0,
+        "#0f766e",
+        "{{me}}",
+        0,
+        "{{me}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-9 days','+73 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-9 days','+73 minutes'), ?)",
+      "params": [
+        "perf-cal-073",
+        "Dinner with the Okafors",
+        "Their place",
+        "{{date:1}}",
+        "18:30",
+        "{{date:1}}",
+        "21:00",
+        0,
+        "#4f46e5",
+        "{{partner}}",
+        0,
+        "{{partner}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-8 days','+74 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-8 days','+74 minutes'), ?)",
+      "params": [
+        "perf-cal-074",
+        "Oil change",
+        "Summit Auto",
+        "{{date:2}}",
+        "08:00",
+        "{{date:2}}",
+        "09:00",
+        0,
+        "#0891b2",
+        "{{me}}",
+        0,
+        "{{me}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, start_date, end_date, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-8 days','+75 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-8 days','+75 minutes'), ?)",
+      "params": [
+        "perf-cal-075",
+        "Camping trip",
+        "{{date:2}}",
+        "{{date:4}}",
+        1,
+        "#16a34a",
+        "{{adult2}}",
+        0,
+        "{{adult2}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, description, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-7 days','+76 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-7 days','+76 minutes'), ?)",
+      "params": [
+        "perf-cal-076",
+        "Haircuts",
+        "Bring the insurance card and arrive ten minutes early.",
+        "Main Street Barbers",
+        "{{date:3}}",
+        "16:00",
+        "{{date:3}}",
+        "17:00",
+        0,
+        "#d97706",
+        "{{child}}",
+        0,
+        "{{child}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-6 days','+77 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-6 days','+77 minutes'), ?)",
+      "params": [
+        "perf-cal-077",
+        "Vet: annual shots",
+        "Cedar Ridge Vet",
+        "{{date:4}}",
+        "10:30",
+        "{{date:4}}",
+        "11:15",
+        0,
+        "#dc2626",
+        "{{me}}",
+        0,
+        "{{me}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-6 days','+78 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-6 days','+78 minutes'), ?)",
+      "params": [
+        "perf-cal-078",
+        "Soccer game",
+        "Riverside Park",
+        "{{date:4}}",
+        "10:00",
+        "{{date:4}}",
+        "11:30",
+        0,
+        "#7c3aed",
+        "{{partner}}",
+        0,
+        "{{partner}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-5 days','+79 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-5 days','+79 minutes'), ?)",
+      "params": [
+        "perf-cal-079",
+        "Birthday party",
+        "Jump Zone",
+        "{{date:5}}",
+        "13:00",
+        "{{date:5}}",
+        "15:00",
+        0,
+        "#db2777",
+        "{{child2}}",
+        0,
+        "{{child2}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, start_date, end_date, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-4 days','+80 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-4 days','+80 minutes'), ?)",
+      "params": [
+        "perf-cal-080",
+        "Field trip: science museum",
+        "{{date:6}}",
+        "{{date:6}}",
+        1,
+        "#0f766e",
+        "{{me}}",
+        0,
+        "{{me}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-4 days','+81 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-4 days','+81 minutes'), ?)",
+      "params": [
+        "perf-cal-081",
+        "Plumber visit",
+        "{{date:6}}",
+        "12:00",
+        "{{date:6}}",
+        "14:00",
+        0,
+        "#4f46e5",
+        "{{partner}}",
+        0,
+        "{{partner}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-3 days','+82 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-3 days','+82 minutes'), ?)",
+      "params": [
+        "perf-cal-082",
+        "Science fair",
+        "School gym",
+        "{{date:7}}",
+        "17:30",
+        "{{date:7}}",
+        "19:30",
+        0,
+        "#0891b2",
+        "{{me}}",
+        0,
+        "{{me}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-2 days','+83 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-2 days','+83 minutes'), ?)",
+      "params": [
+        "perf-cal-083",
+        "Orthodontist",
+        "Brightline Ortho",
+        "{{date:8}}",
+        "15:15",
+        "{{date:8}}",
+        "16:00",
+        0,
+        "#16a34a",
+        "{{adult2}}",
+        0,
+        "{{adult2}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, description, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-2 days','+84 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-2 days','+84 minutes'), ?)",
+      "params": [
+        "perf-cal-084",
+        "Dentist: cleaning",
+        "Bring the insurance card and arrive ten minutes early.",
+        "Lakeside Dental",
+        "{{date:8}}",
+        "09:00",
+        "{{date:8}}",
+        "10:00",
+        0,
+        "#d97706",
+        "{{child}}",
+        0,
+        "{{child}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, start_date, end_date, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+85 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+85 minutes'), ?)",
+      "params": [
+        "perf-cal-085",
+        "Recycling drop-off day",
+        "{{date:9}}",
+        "{{date:9}}",
+        1,
+        "#dc2626",
+        "{{me}}",
+        0,
+        "{{me}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+86 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+86 minutes'), ?)",
+      "params": [
+        "perf-cal-086",
+        "Pediatrician checkup",
+        "Northwind Health",
+        "{{date:10}}",
+        "11:00",
+        "{{date:10}}",
+        "11:45",
+        0,
+        "#7c3aed",
+        "{{partner}}",
+        0,
+        "{{partner}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+87 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+87 minutes'), ?)",
+      "params": [
+        "perf-cal-087",
+        "Dinner with the Okafors",
+        "Their place",
+        "{{date:10}}",
+        "18:30",
+        "{{date:10}}",
+        "21:00",
+        0,
+        "#db2777",
+        "{{child2}}",
+        0,
+        "{{child2}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, description, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+88 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+88 minutes'), ?)",
+      "params": [
+        "perf-cal-088",
+        "Oil change",
+        "Bring the insurance card and arrive ten minutes early.",
+        "Summit Auto",
+        "{{date:11}}",
+        "08:00",
+        "{{date:11}}",
+        "09:00",
+        0,
+        "#0f766e",
+        "{{me}}",
+        0,
+        "{{me}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+89 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+89 minutes'), ?)",
+      "params": [
+        "perf-cal-089",
+        "School concert",
+        "Auditorium",
+        "{{date:12}}",
+        "19:00",
+        "{{date:12}}",
+        "20:30",
+        0,
+        "#4f46e5",
+        "{{partner}}",
+        0,
+        "{{partner}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, start_date, end_date, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+90 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+90 minutes'), ?)",
+      "params": [
+        "perf-cal-090",
+        "Quarterly taxes due",
+        "{{date:12}}",
+        "{{date:12}}",
+        1,
+        "#0891b2",
+        "{{me}}",
+        0,
+        "{{me}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+91 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+91 minutes'), ?)",
+      "params": [
+        "perf-cal-091",
+        "Vet: annual shots",
+        "Cedar Ridge Vet",
+        "{{date:13}}",
+        "10:30",
+        "{{date:13}}",
+        "11:15",
+        0,
+        "#16a34a",
+        "{{adult2}}",
+        0,
+        "{{adult2}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, description, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+92 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+92 minutes'), ?)",
+      "params": [
+        "perf-cal-092",
+        "Soccer game",
+        "Bring the insurance card and arrive ten minutes early.",
+        "Riverside Park",
+        "{{date:14}}",
+        "10:00",
+        "{{date:14}}",
+        "11:30",
+        0,
+        "#d97706",
+        "{{child}}",
+        0,
+        "{{child}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+93 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+93 minutes'), ?)",
+      "params": [
+        "perf-cal-093",
+        "Birthday party",
+        "Jump Zone",
+        "{{date:14}}",
+        "13:00",
+        "{{date:14}}",
+        "15:00",
+        0,
+        "#dc2626",
+        "{{me}}",
+        0,
+        "{{me}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+94 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+94 minutes'), ?)",
+      "params": [
+        "perf-cal-094",
+        "Work dinner",
+        "Downtown",
+        "{{date:16}}",
+        "18:00",
+        "{{date:16}}",
+        "20:00",
+        0,
+        "#7c3aed",
+        "{{partner}}",
+        0,
+        "{{partner}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, start_date, end_date, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+95 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+95 minutes'), ?)",
+      "params": [
+        "perf-cal-095",
+        "Cousins in town",
+        "{{date:17}}",
+        "{{date:21}}",
+        1,
+        "#db2777",
+        "{{child2}}",
+        0,
+        "{{child2}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, description, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+96 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+96 minutes'), ?)",
+      "params": [
+        "perf-cal-096",
+        "Science fair",
+        "Bring the insurance card and arrive ten minutes early.",
+        "School gym",
+        "{{date:19}}",
+        "17:30",
+        "{{date:19}}",
+        "19:30",
+        0,
+        "#0f766e",
+        "{{me}}",
+        0,
+        "{{me}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+97 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+97 minutes'), ?)",
+      "params": [
+        "perf-cal-097",
+        "Orthodontist",
+        "Brightline Ortho",
+        "{{date:20}}",
+        "15:15",
+        "{{date:20}}",
+        "16:00",
+        0,
+        "#4f46e5",
+        "{{partner}}",
+        0,
+        "{{partner}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+98 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+98 minutes'), ?)",
+      "params": [
+        "perf-cal-098",
+        "Dentist: cleaning",
+        "Lakeside Dental",
+        "{{date:20}}",
+        "09:00",
+        "{{date:20}}",
+        "10:00",
+        0,
+        "#0891b2",
+        "{{me}}",
+        0,
+        "{{me}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+99 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+99 minutes'), ?)",
+      "params": [
+        "perf-cal-099",
+        "Parent-teacher conference",
+        "Room 12",
+        "{{date:22}}",
+        "14:15",
+        "{{date:22}}",
+        "14:30",
+        0,
+        "#16a34a",
+        "{{adult2}}",
+        0,
+        "{{adult2}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, start_date, end_date, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+100 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+100 minutes'), ?)",
+      "params": [
+        "perf-cal-100",
+        "No school: teacher in-service",
+        "{{date:23}}",
+        "{{date:23}}",
+        1,
+        "#d97706",
+        "{{child}}",
+        0,
+        "{{child}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+101 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+101 minutes'), ?)",
+      "params": [
+        "perf-cal-101",
+        "Dinner with the Okafors",
+        "Their place",
+        "{{date:25}}",
+        "18:30",
+        "{{date:25}}",
+        "21:00",
+        0,
+        "#dc2626",
+        "{{me}}",
+        0,
+        "{{me}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+102 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+102 minutes'), ?)",
+      "params": [
+        "perf-cal-102",
+        "Oil change",
+        "Summit Auto",
+        "{{date:25}}",
+        "08:00",
+        "{{date:25}}",
+        "09:00",
+        0,
+        "#7c3aed",
+        "{{partner}}",
+        0,
+        "{{partner}}",
+        "private"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+103 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+103 minutes'), ?)",
+      "params": [
+        "perf-cal-103",
+        "School concert",
+        "Auditorium",
+        "{{date:26}}",
+        "19:00",
+        "{{date:26}}",
+        "20:30",
+        0,
+        "#db2777",
+        "{{child2}}",
+        0,
+        "{{child2}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, description, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+104 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+104 minutes'), ?)",
+      "params": [
+        "perf-cal-104",
+        "Haircuts",
+        "Bring the insurance card and arrive ten minutes early.",
+        "Main Street Barbers",
+        "{{date:28}}",
+        "16:00",
+        "{{date:28}}",
+        "17:00",
+        0,
+        "#0f766e",
+        "{{me}}",
+        0,
+        "{{me}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, start_date, end_date, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+105 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+105 minutes'), ?)",
+      "params": [
+        "perf-cal-105",
+        "Library books due",
+        "{{date:29}}",
+        "{{date:29}}",
+        1,
+        "#4f46e5",
+        "{{partner}}",
+        0,
+        "{{partner}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+106 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+106 minutes'), ?)",
+      "params": [
+        "perf-cal-106",
+        "Soccer game",
+        "Riverside Park",
+        "{{date:31}}",
+        "10:00",
+        "{{date:31}}",
+        "11:30",
+        0,
+        "#0891b2",
+        "{{me}}",
+        0,
+        "{{me}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+107 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+107 minutes'), ?)",
+      "params": [
+        "perf-cal-107",
+        "Birthday party",
+        "Jump Zone",
+        "{{date:32}}",
+        "13:00",
+        "{{date:32}}",
+        "15:00",
+        0,
+        "#16a34a",
+        "{{adult2}}",
+        0,
+        "{{adult2}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, description, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+108 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+108 minutes'), ?)",
+      "params": [
+        "perf-cal-108",
+        "Work dinner",
+        "Bring the insurance card and arrive ten minutes early.",
+        "Downtown",
+        "{{date:34}}",
+        "18:00",
+        "{{date:34}}",
+        "20:00",
+        0,
+        "#d97706",
+        "{{child}}",
+        0,
+        "{{child}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+109 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+109 minutes'), ?)",
+      "params": [
+        "perf-cal-109",
+        "Plumber visit",
+        "{{date:35}}",
+        "12:00",
+        "{{date:35}}",
+        "14:00",
+        0,
+        "#dc2626",
+        "{{me}}",
+        0,
+        "{{me}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, start_date, end_date, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+110 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+110 minutes'), ?)",
+      "params": [
+        "perf-cal-110",
+        "Car registration due",
+        "{{date:35}}",
+        "{{date:35}}",
+        1,
+        "#7c3aed",
+        "{{partner}}",
+        0,
+        "{{partner}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+111 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+111 minutes'), ?)",
+      "params": [
+        "perf-cal-111",
+        "Orthodontist",
+        "Brightline Ortho",
+        "{{date:37}}",
+        "15:15",
+        "{{date:37}}",
+        "16:00",
+        0,
+        "#db2777",
+        "{{child2}}",
+        0,
+        "{{child2}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, description, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+112 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+112 minutes'), ?)",
+      "params": [
+        "perf-cal-112",
+        "Dentist: cleaning",
+        "Bring the insurance card and arrive ten minutes early.",
+        "Lakeside Dental",
+        "{{date:38}}",
+        "09:00",
+        "{{date:38}}",
+        "10:00",
+        0,
+        "#0f766e",
+        "{{me}}",
+        0,
+        "{{me}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+113 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+113 minutes'), ?)",
+      "params": [
+        "perf-cal-113",
+        "Parent-teacher conference",
+        "Room 12",
+        "{{date:40}}",
+        "14:15",
+        "{{date:40}}",
+        "14:30",
+        0,
+        "#4f46e5",
+        "{{partner}}",
+        0,
+        "{{partner}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+114 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+114 minutes'), ?)",
+      "params": [
+        "perf-cal-114",
+        "Pediatrician checkup",
+        "Northwind Health",
+        "{{date:40}}",
+        "11:00",
+        "{{date:40}}",
+        "11:45",
+        0,
+        "#0891b2",
+        "{{me}}",
+        0,
+        "{{me}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, start_date, end_date, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+115 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+115 minutes'), ?)",
+      "params": [
+        "perf-cal-115",
+        "Picture day",
+        "{{date:41}}",
+        "{{date:41}}",
+        1,
+        "#16a34a",
+        "{{adult2}}",
+        0,
+        "{{adult2}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, description, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+116 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+116 minutes'), ?)",
+      "params": [
+        "perf-cal-116",
+        "Oil change",
+        "Bring the insurance card and arrive ten minutes early.",
+        "Summit Auto",
+        "{{date:43}}",
+        "08:00",
+        "{{date:43}}",
+        "09:00",
+        0,
+        "#d97706",
+        "{{child}}",
+        0,
+        "{{child}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+117 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+117 minutes'), ?)",
+      "params": [
+        "perf-cal-117",
+        "School concert",
+        "Auditorium",
+        "{{date:44}}",
+        "19:00",
+        "{{date:44}}",
+        "20:30",
+        0,
+        "#dc2626",
+        "{{me}}",
+        0,
+        "{{me}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+118 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+118 minutes'), ?)",
+      "params": [
+        "perf-cal-118",
+        "Haircuts",
+        "Main Street Barbers",
+        "{{date:46}}",
+        "16:00",
+        "{{date:46}}",
+        "17:00",
+        0,
+        "#7c3aed",
+        "{{partner}}",
+        0,
+        "{{partner}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+119 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+119 minutes'), ?)",
+      "params": [
+        "perf-cal-119",
+        "Vet: annual shots",
+        "Cedar Ridge Vet",
+        "{{date:47}}",
+        "10:30",
+        "{{date:47}}",
+        "11:15",
+        0,
+        "#db2777",
+        "{{child2}}",
+        0,
+        "{{child2}}",
+        "private"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, start_date, end_date, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+120 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+120 minutes'), ?)",
+      "params": [
+        "perf-cal-120",
+        "Grandma visiting",
+        "{{date:49}}",
+        "{{date:52}}",
+        1,
+        "#0f766e",
+        "{{me}}",
+        0,
+        "{{me}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+121 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+121 minutes'), ?)",
+      "params": [
+        "perf-cal-121",
+        "Birthday party",
+        "Jump Zone",
+        "{{date:50}}",
+        "13:00",
+        "{{date:50}}",
+        "15:00",
+        0,
+        "#4f46e5",
+        "{{partner}}",
+        0,
+        "{{partner}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__events (id, title, location, start_date, start_time, end_date, end_time, all_day, color, organizer_id, is_cancelled, created_by, created_at, updated_at, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+122 minutes'), strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 days','+122 minutes'), ?)",
+      "params": [
+        "perf-cal-122",
+        "Work dinner",
+        "Downtown",
+        "{{date:50}}",
+        "18:00",
+        "{{date:50}}",
+        "20:00",
+        0,
+        "#0891b2",
+        "{{me}}",
+        0,
+        "{{me}}",
+        "everyone"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__hidden_synced_events (event_id, hidden_at) VALUES (?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-20 days','+0 minutes'))",
+      "params": [
+        "perf-synced-evt-01"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__hidden_synced_events (event_id, hidden_at) VALUES (?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-16 days','+0 minutes'))",
+      "params": [
+        "perf-synced-evt-02"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__hidden_synced_events (event_id, hidden_at) VALUES (?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-12 days','+0 minutes'))",
+      "params": [
+        "perf-synced-evt-03"
+      ]
+    },
+    {
+      "sql": "INSERT INTO app_calendar__hidden_synced_events (event_id, hidden_at) VALUES (?, strftime('%Y-%m-%dT%H:%M:%fZ','now','-8 days','+0 minutes'))",
+      "params": [
+        "perf-synced-evt-04"
+      ]
+    }
+  ]
+}
