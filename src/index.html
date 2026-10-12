@@ -428,6 +428,10 @@
       padding: 10px 12px; font-size: 0.8rem; color: var(--hub-tint-warning-fg, #92400e); margin-top: 12px;
     }
     .conflict-box ul { margin: 4px 0 0 18px; }
+    .form-error {
+      background: var(--hub-tint-danger, #fee2e2); color: var(--hub-tint-danger-fg, #b91c1c); border-radius: 8px;
+      padding: 10px 12px; font-size: 0.8rem; margin-top: 12px;
+    }
     .cross-notice {
       background: var(--hub-tint-warning, #fffbeb); border: 1px solid var(--hub-tint-warning-border, #fcd34d); border-radius: 8px;
       padding: 8px 12px; font-size: 0.8rem; color: var(--hub-tint-warning-fg, #92400e); margin: 0 0 10px;
@@ -1691,7 +1695,8 @@ async function runDragCommit(ev, patch, entry) {
       entry.patch = null;   // failed: never let a reload reapply it
       if (restore) localEvents = localEvents.map(e => e.id === ev.id ? { ...e, ...restore } : e);
       renderPreservingScroll();
-      showWriteError(err?.message || "This event could not be moved.");
+      console.error(err);
+      showWriteError("Couldn’t move the event — try again.");
     }
   } catch (err) {
     // This function must never reject. The drop handler does not await it —
@@ -1701,7 +1706,8 @@ async function runDragCommit(ev, patch, entry) {
     if (entry.patch && restore) localEvents = localEvents.map(e => e.id === ev.id ? { ...e, ...restore } : e);
     entry.patch = null;
     renderPreservingScroll();
-    showWriteError(err?.message || "This event could not be moved.");
+    console.error(err);
+    showWriteError("Couldn’t move the event — try again.");
   }
   // No finally: the entry is retired by commitDrag, which owns it.
 }
@@ -1944,7 +1950,8 @@ async function runSeriesDragCommit(drop, scope) {
     // Never rejects, for the reason runDragCommit gives: nothing awaits this,
     // so a rejection would surface as nothing but an unhandled one.
     renderPreservingScroll();
-    showWriteError(err?.message || "This event could not be moved.");
+    console.error(err);
+    showWriteError("Couldn’t move the event — try again.");
   }
 }
 
@@ -2117,11 +2124,36 @@ function showWriteError(message) {
   dragErrorTimer = setTimeout(() => box.remove(), 5000);
 }
 
-// A batch that failed outright (not a 409 refusal): say so and hand back null,
+// A delete batch that failed outright (not a 409 refusal): say so and hand back null,
 // which callers tell apart from `false`, the guard declining.
 function writeFailed(err) {
-  showWriteError(err?.message || "Couldn’t reach the hub. Try again.");
+  console.error(err);
+  showWriteError("Couldn’t delete the event — try again.");
   return null;
+}
+
+// The event form's save failed outright: the form stays open as typed, says so
+// in its own error line, and its button works again.
+function formSaveFailed() {
+  if (!modalEl) { showWriteError("Couldn’t save — try again."); return; }
+  let box = document.getElementById("form-error");
+  if (!box) {
+    box = document.createElement("div");
+    box.id = "form-error";
+    box.className = "form-error";
+    box.dataset.testid = "form-error";
+    box.setAttribute("role", "alert");
+    modalEl.querySelector(".modal-actions")?.before(box);
+  }
+  box.textContent = "Couldn’t save — try again.";
+  const btn = modalEl.querySelector(".modal-actions .btn-primary");
+  if (btn) { btn.disabled = false; btn.textContent = btn.dataset.label ?? btn.textContent; }
+}
+// The other half: one press at a time, and the label to put back afterwards.
+function formSaving() {
+  const btn = modalEl?.querySelector(".modal-actions .btn-primary");
+  if (btn) { btn.dataset.label = btn.textContent; btn.disabled = true; btn.textContent = "Saving…"; }
+  document.getElementById("form-error")?.remove();
 }
 
 function renderDay() { renderTimeGrid([toDateStr(pivot)]); }
@@ -2456,6 +2488,21 @@ window.submitCreate = async function() {
   if (!data.title) { document.getElementById("ef-title").focus(); return; }
   if (warnConflicts(data)) return;
   const id = crypto.randomUUID(), now = new Date().toISOString();
+  // The form stays open until the hub has the event: a save that fails says so
+  // in the form and leaves what was typed in place to send again, and nothing
+  // is drawn on the calendar for an event the hub never got.
+  formSaving();
+  try {
+    await db(
+      `INSERT INTO app_calendar__events (id,title,description,location,start_date,start_time,end_date,end_time,all_day,color,organizer_id,attendee_ids,recurrence,source,created_by,created_at,updated_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'local',?,?,?)`,
+      [id, data.title, data.description, data.location, data.start_date, data.start_time, data.end_date, data.end_time,
+       data.all_day, data.color, ME?.id ?? null, data.attendee_ids, data.recurrence, ME?.id ?? null, now, now]
+    );
+  } catch {
+    formSaveFailed();
+    return;
+  }
   localEvents.push({
     id, ...data, source: "local",
     organizer_id: ME?.id ?? null, created_by: ME?.id ?? null,
@@ -2464,29 +2511,17 @@ window.submitCreate = async function() {
   });
   closeModal();
   render();
-  try {
-    await db(
-      `INSERT INTO app_calendar__events (id,title,description,location,start_date,start_time,end_date,end_time,all_day,color,organizer_id,attendee_ids,recurrence,source,created_by,created_at,updated_at)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'local',?,?,?)`,
-      [id, data.title, data.description, data.location, data.start_date, data.start_time, data.end_date, data.end_time,
-       data.all_day, data.color, ME?.id ?? null, data.attendee_ids, data.recurrence, ME?.id ?? null, now, now]
-    );
-    // member_id repeats created_by because the hub's roster attribution reads
-    // member_id and nothing else: without it the event is attributed to its
-    // subject (the event row id), which is not a member row, so a roster peer
-    // never sees a steward's calendar event. Contract CI enforces the pairing.
-    await publishEvent("calendar.event_created", id, {
-      title: data.title,
-      start_date: data.start_date,
-      all_day: data.all_day === 1,
-      created_by: ME?.id ?? "unknown",
-      member_id: ME?.id ?? "unknown",
-    });
-  } catch (err) {
-    localEvents = localEvents.filter(e => e.id !== id);
-    render();
-    showWriteError(err?.message || "This event could not be saved.");
-  }
+  // member_id repeats created_by because the hub's roster attribution reads
+  // member_id and nothing else: without it the event is attributed to its
+  // subject (the event row id), which is not a member row, so a roster peer
+  // never sees a steward's calendar event. Contract CI enforces the pairing.
+  await publishEvent("calendar.event_created", id, {
+    title: data.title,
+    start_date: data.start_date,
+    all_day: data.all_day === 1,
+    created_by: ME?.id ?? "unknown",
+    member_id: ME?.id ?? "unknown",
+  });
 };
 
 // ─── Edit ─────────────────────────────────────────────────────────────────
@@ -2551,11 +2586,14 @@ window.submitEdit = async function(primaryId, scope, occDate, parentVersion, ove
   const seriesIds = new Set([primaryId, ...localEvents.filter(e => e.recurring_event_id === primaryId).map(e => e.id)]);
   if (warnConflicts(data, seriesIds)) return;
 
+  // One press at a time. The form stays open until the hub has answered: a
+  // save that fails outright says so in the form and leaves what was typed in
+  // place to send again (formSaveFailed); a refusal still closes it, since
+  // the form's contents are then a statement about a version that is gone.
+  formSaving();
+
   if (scope === "all" || !primary.recurrence) {
-    const prevEvents = [...localEvents];
-    localEvents = localEvents.map(e => e.id === primaryId ? { ...e, ...data, updated_at: now } : e);
-    closeModal();
-    render();
+    let changed;
     try {
       // Version-guarded for the same reason the standalone drag is, and with
       // the same consequence if it is not: this statement writes whole times
@@ -2566,32 +2604,28 @@ window.submitEdit = async function(primaryId, scope, occDate, parentVersion, ove
                start_date: data.start_date, start_time: data.start_time,
                end_date: data.end_date, end_time: data.end_time,
                all_day: data.all_day, color: data.color, attendee_ids: data.attendee_ids, recurrence: data.recurrence } });
-      const { changed } = await db(stmt.sql, stmt.params);
-      if (changed === 0) {
-        // Refused, not failed: the row is fine, this form's idea of it is not.
-        localEvents = withPendingDrags(prevEvents);
-        render();
-        showWriteError("This event changed somewhere else while you had it open. Your edit was not saved \u2014 reopen it to see the current version.");
-      }
-    } catch (err) {
-      showWriteError(err?.message || "This event could not be saved.");
-      // Restored THROUGH the pending-drag registry. Before drags existed every
-      // mutation went through this modal and could not overlap another, so a
-      // wholesale snapshot was a safe undo. A drag on a different event can
-      // now land between this snapshot and this failure, and replaying the
-      // snapshot raw would wipe that move off the screen while its write had
-      // already succeeded.
-      localEvents = withPendingDrags(prevEvents);
-      render();
+      ({ changed } = await db(stmt.sql, stmt.params));
+    } catch {
+      formSaveFailed();
+      return;
     }
+    closeModal();
+    if (changed === 0) {
+      // Refused, not failed: the row is fine, this form's idea of it is not.
+      showWriteError("This event changed somewhere else while you had it open. Your edit was not saved \u2014 reopen it to see the current version.");
+      return;
+    }
+    // Applied to the list as it is NOW, not to a snapshot from before the
+    // write: a drag on a different event can settle while this one is in
+    // flight, and its move must survive.
+    localEvents = localEvents.map(e => e.id === primaryId ? { ...e, ...data, updated_at: now } : e);
+    render();
     return;
   }
 
   // Recurrence scopes — pessimistic (multi-step operations). Every branch
   // claims the series at the version this form was built from; see claimSeries.
   let applied = true;
-  const btn = modalEl?.querySelector('.modal-actions .btn-primary');
-  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
   if (scope === "this") {
     const existing = findOverride(primaryId, occDate);
     const durDays = daysBetween(primary.start_date, primary.end_date);
@@ -2611,7 +2645,7 @@ window.submitEdit = async function(primaryId, scope, occDate, parentVersion, ove
                start_date: data.start_date, start_time: data.start_time,
                end_date: endDate, end_time: data.end_time,
                all_day: data.all_day, color: data.color, attendee_ids: data.attendee_ids } }),
-      ]).catch(writeFailed);
+      ]).catch(() => null);
     } else {
       const exId = crypto.randomUUID();
       // visibility is carried from the series for the reason the drag paths
@@ -2621,7 +2655,7 @@ window.submitEdit = async function(primaryId, scope, occDate, parentVersion, ove
         claimSeries(primary, now, parentVersion),
         insertOverride({ id: exId, primary, occDate, actor: ME?.id ?? null, now,
           values: { ...data, end_date: endDate, organizer_id: ME?.id ?? null } }),
-      ]).catch(writeFailed);
+      ]).catch(() => null);
     }
   } else if (scope === "following") {
     const rule = JSON.parse(primary.recurrence ?? "{}");
@@ -2641,9 +2675,9 @@ window.submitEdit = async function(primaryId, scope, occDate, parentVersion, ove
       insertSeries({ id: newId, primary, actor: ME?.id ?? null, now,
         values: { ...data, start_date: occDate, end_date: occDate,
                   organizer_id: ME?.id ?? null, recurrence: data.recurrence } }),
-    ]).catch(writeFailed);
+    ]).catch(() => null);
   }
-  if (applied === null) { closeModal(); render(); return; }
+  if (applied === null) { formSaveFailed(); return; }
   await loadLocalEvents(); closeModal(); render();
   if (!applied) showWriteError("This event could not be saved. It may have been changed or removed — the calendar has been refreshed.");
 };
@@ -2671,7 +2705,8 @@ async function hideEvent(id) {
   } catch (err) {
     syncedEvents = prev;
     render();
-    showWriteError(err?.message || "This event could not be hidden.");
+    console.error(err);
+    showWriteError("Couldn’t hide the event — try again.");
   }
 }
 async function deleteEvent(primaryId, occDate, scope, parentVersion, overrideVersion) {
@@ -2701,7 +2736,7 @@ async function deleteEvent(primaryId, occDate, scope, parentVersion, overrideVer
       { sql: `DELETE FROM app_calendar__events WHERE recurring_event_id=?`, params: [primaryId] },
     ]).catch(writeFailed);
     if (applied === null) {
-      localEvents = withPendingDrags(prevEvents);   // same reason as submitEdit
+      localEvents = withPendingDrags(prevEvents);   // a drag may have settled since the snapshot
       render();
     } else if (!applied) {
       await loadLocalEvents();

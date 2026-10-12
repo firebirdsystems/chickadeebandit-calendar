@@ -58,6 +58,7 @@
     .open-link { font-size: 11px; font-weight: 600; color: var(--hub-text, #111827); text-decoration: none; }
     .open-link:hover { text-decoration: underline; }
 
+    .load-error { margin: 8px; padding: 8px 10px; border-radius: 10px; background: var(--hub-tint-danger, #fee2e2); color: var(--hub-tint-danger-fg, #b91c1c); font-size: 0.8rem; }
     .empty {
       flex: 1; display: flex; flex-direction: column;
       align-items: center; justify-content: center;
@@ -87,12 +88,12 @@ async function dbq(sql, params = []) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ sql, params }),
   });
-  const json = await res.json();
-  // The hub reports a refused write as a JSON body with an `error` key
-  // (403 row policy, 400 bad statement, 507 over quota). fetch() does not
-  // reject on those, so without this throw every caller's rollback and
-  // error toast below is unreachable code.
-  if (!res.ok || json.error) throw new Error(json.error || `Database request failed (${res.status})`);
+  const json = await res.json().catch(() => null);
+  // The hub reports a refused request as a JSON body with an `error` key
+  // (403 row policy, 400 bad statement, 507 over quota), and a proxy can
+  // answer 200 with a body that is not JSON at all. fetch() rejects on
+  // neither, so without this throw a failed read would draw as "nothing here".
+  if (!res.ok || !json || typeof json !== "object" || json.error) throw new Error(json?.error || `Database request failed (${res.status})`);
   return json;
 }
 
@@ -185,7 +186,7 @@ async function load() {
 }
 
 load().catch(() => {
-  document.body.innerHTML = `<div class="empty"><a href="/open/${APP_ID}" style="color:#111827;font-weight:600">Open Calendar →</a></div>`;
+  document.body.innerHTML = `<div class="load-error" data-testid="load-error" role="alert">Couldn’t load your events.</div><div class="empty"><a href="/open/${APP_ID}" style="color:#111827;font-weight:600">Open Calendar →</a></div>`;
 });
 </script>
 </body>
