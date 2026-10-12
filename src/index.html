@@ -433,6 +433,16 @@
       padding: 8px 12px; font-size: 0.8rem; color: var(--hub-tint-warning-fg, #92400e); margin: 0 0 10px;
     }
     .cross-notice[hidden] { display: none; }
+    .load-error {
+      margin: 0 0 12px; padding: 10px 14px; border-radius: 10px;
+      background: var(--hub-tint-danger, #fee2e2); color: var(--hub-tint-danger-fg, #b91c1c);
+      font-size: 0.9rem; display: flex; gap: 10px; align-items: center; justify-content: space-between;
+    }
+    .load-error[hidden] { display: none; }
+    .load-error-retry {
+      background: none; border: 1px solid currentColor; border-radius: 8px;
+      padding: 4px 10px; color: inherit; font: inherit; cursor: pointer; white-space: nowrap;
+    }
     .search-row { margin-bottom: 12px; }
     .search-input {
       width: 100%; border: 1.5px solid var(--border-mid, var(--border, #d1d5db));
@@ -464,6 +474,7 @@
   </div>
   <div class="member-bar" id="member-bar" data-testid="member-bar"></div>
   <div class="cross-notice" id="cross-notice" data-testid="cross-notice" hidden></div>
+  <div class="load-error" id="load-error" data-testid="load-error" role="alert" hidden><span>Couldn’t load your events.</span> <button type="button" class="load-error-retry" data-testid="load-retry" onclick="retryLoad()">Try again</button></div>
   <div id="root" data-testid="root"><div class="loading">Loading…</div></div>
 </div>
 
@@ -537,6 +548,8 @@ let members      = [];
 let localEvents  = [];
 let syncedEvents = [];
 let crossAppShortfall = null; // set by loadSyncedEvents, shown by render()
+let loadFailed = false;       // the first read of this calendar's events failed and none has succeeded since; shown by render()
+let rosterFailed = false;     // the first read of the member list failed; same banner
 let memberFilter = new Set();
 let viewMode     = "week";
 let searchQ = "";       // in-app search (see logic.js searchableFields)
@@ -571,12 +584,12 @@ const HOUR_H = 56; // px per hour in time grid
 async function db(sql, params = []) {
   if (!DB) return { rows: [] };
   const res = await fetch(DB, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sql, params }) });
-  const json = await res.json();
+  const json = await res.json().catch(() => null);
   // The hub reports a refused write as a JSON body with an `error` key
   // (403 row policy, 400 bad statement, 507 over quota). fetch() does not
   // reject on those, so without this throw every caller's rollback and
   // error toast below is unreachable code.
-  if (!res.ok || json.error) throw dbError(res, json);
+  if (!res.ok || !json || typeof json !== "object" || json.error) throw dbError(res, json);
   return json;
 }
 /**
@@ -590,7 +603,7 @@ async function db(sql, params = []) {
  * along.
  */
 function dbError(res, json) {
-  const err = new Error(json.error || `Database request failed (${res.status})`);
+  const err = new Error(json?.error || `Database request failed (${res.status})`);
   err.status = res.status;
   return err;
 }
@@ -606,8 +619,8 @@ function dbError(res, json) {
 async function dbBatch(statements) {
   if (!DB || statements.length === 0) return { results: [] };
   const res = await fetch(DB, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ statements }) });
-  const json = await res.json();
-  if (!res.ok || json.error) throw dbError(res, json);
+  const json = await res.json().catch(() => null);
+  if (!res.ok || !json || typeof json !== "object" || json.error) throw dbError(res, json);
   return json;
 }
 async function initDb() {
@@ -643,6 +656,7 @@ async function loadLocalEvents(exceptId = null) {
   // localEvents afterwards, so the combined list needs re-ordering by the same
   // rule the SQL applies.
   const { rows } = await db(`SELECT * FROM app_calendar__events WHERE source = 'local' ORDER BY start_date, start_time`);
+  loadFailed = false;
   // Patched BEFORE the sort: a restored patch changes start_time and, for a
   // cross-day drag, start_date — which is the SQL's first sort key — and
   // localEvents is expected to be in the order the SQL asked for.
@@ -665,6 +679,12 @@ async function loadSyncedEvents() {
       : errors.includes("cross.calendar_events")
         ? "Events from other apps couldn't be loaded right now."
         : null;
+    // The same for the household's synced calendars: unread is not "none".
+    if (errors.includes("family.calendar")) {
+      crossAppShortfall = errors.includes("cross.calendar_events")
+        ? "Synced events and events from other apps couldn't be loaded right now."
+        : ["Synced calendar events couldn't be loaded right now.", crossAppShortfall].filter(Boolean).join(" ");
+    }
     const timeZone = hubTimeZone();
     const normalizeBase = ev => {
       const allDay = Boolean(ev.all_day ?? ev.allDay);
@@ -701,7 +721,11 @@ async function loadSyncedEvents() {
       ...crossAppEvents.map(ev => ({ ...normalizeBase(ev), source: "cross-app", color: "#0369a1", source_label: ev.source_label ?? null })),
     ];
     syncedEvents = allSynced.filter(ev => !hiddenIds.has(ev.id));
-  } catch { syncedEvents = []; }
+  } catch {
+    // An overlay that could not be read says so; it is not an empty one.
+    syncedEvents = [];
+    crossAppShortfall = "Synced events and events from other apps couldn't be loaded right now.";
+  }
 }
 
 // ─── Recurrence expansion ─────────────────────────────────────────────────
@@ -834,6 +858,7 @@ function render() {
   updateTitle();
   renderMemberBar();
   renderCrossNotice();
+  document.getElementById("load-error").hidden = !(loadFailed || rosterFailed);
   if (viewMode === "month")  renderMonth();
   else if (viewMode === "week") renderWeek();
   else if (viewMode === "day")  renderDay();
@@ -2092,6 +2117,13 @@ function showWriteError(message) {
   dragErrorTimer = setTimeout(() => box.remove(), 5000);
 }
 
+// A batch that failed outright (not a 409 refusal): say so and hand back null,
+// which callers tell apart from `false`, the guard declining.
+function writeFailed(err) {
+  showWriteError(err?.message || "Couldn’t reach the hub. Try again.");
+  return null;
+}
+
 function renderDay() { renderTimeGrid([toDateStr(pivot)]); }
 function renderWeek() {
   const ws = getWeekStart(pivot);
@@ -2118,6 +2150,7 @@ function renderAgenda() {
   if (!evs.length) {
     document.getElementById("root").innerHTML = searchRow + (searchQ
       ? `<div class="agenda-empty" data-testid="agenda-empty">No events match "${esc(searchQ)}" within a year either way.</div>`
+      : loadFailed ? ""
       : `<div class="agenda-empty" data-testid="agenda-empty">No events in the next 60 days.</div>`);
     restoreSearchCaret();
     return;
@@ -2449,9 +2482,10 @@ window.submitCreate = async function() {
       created_by: ME?.id ?? "unknown",
       member_id: ME?.id ?? "unknown",
     });
-  } catch {
+  } catch (err) {
     localEvents = localEvents.filter(e => e.id !== id);
     render();
+    showWriteError(err?.message || "This event could not be saved.");
   }
 };
 
@@ -2539,7 +2573,8 @@ window.submitEdit = async function(primaryId, scope, occDate, parentVersion, ove
         render();
         showWriteError("This event changed somewhere else while you had it open. Your edit was not saved \u2014 reopen it to see the current version.");
       }
-    } catch {
+    } catch (err) {
+      showWriteError(err?.message || "This event could not be saved.");
       // Restored THROUGH the pending-drag registry. Before drags existed every
       // mutation went through this modal and could not overlap another, so a
       // wholesale snapshot was a safe undo. A drag on a different event can
@@ -2576,7 +2611,7 @@ window.submitEdit = async function(primaryId, scope, occDate, parentVersion, ove
                start_date: data.start_date, start_time: data.start_time,
                end_date: endDate, end_time: data.end_time,
                all_day: data.all_day, color: data.color, attendee_ids: data.attendee_ids } }),
-      ]);
+      ]).catch(writeFailed);
     } else {
       const exId = crypto.randomUUID();
       // visibility is carried from the series for the reason the drag paths
@@ -2586,7 +2621,7 @@ window.submitEdit = async function(primaryId, scope, occDate, parentVersion, ove
         claimSeries(primary, now, parentVersion),
         insertOverride({ id: exId, primary, occDate, actor: ME?.id ?? null, now,
           values: { ...data, end_date: endDate, organizer_id: ME?.id ?? null } }),
-      ]);
+      ]).catch(writeFailed);
     }
   } else if (scope === "following") {
     const rule = JSON.parse(primary.recurrence ?? "{}");
@@ -2606,8 +2641,9 @@ window.submitEdit = async function(primaryId, scope, occDate, parentVersion, ove
       insertSeries({ id: newId, primary, actor: ME?.id ?? null, now,
         values: { ...data, start_date: occDate, end_date: occDate,
                   organizer_id: ME?.id ?? null, recurrence: data.recurrence } }),
-    ]);
+    ]).catch(writeFailed);
   }
+  if (applied === null) { closeModal(); render(); return; }
   await loadLocalEvents(); closeModal(); render();
   if (!applied) showWriteError("This event could not be saved. It may have been changed or removed — the calendar has been refreshed.");
 };
@@ -2632,9 +2668,10 @@ async function hideEvent(id) {
   try {
     const now = new Date().toISOString();
     await db(`INSERT INTO app_calendar__hidden_synced_events (event_id, hidden_at) VALUES (?,?) ON CONFLICT DO NOTHING`, [id, now]);
-  } catch {
+  } catch (err) {
     syncedEvents = prev;
     render();
+    showWriteError(err?.message || "This event could not be hidden.");
   }
 }
 async function deleteEvent(primaryId, occDate, scope, parentVersion, overrideVersion) {
@@ -2662,7 +2699,7 @@ async function deleteEvent(primaryId, occDate, scope, parentVersion, overrideVer
       { sql: `DELETE FROM app_calendar__events WHERE id=? AND updated_at=?`,
         params: [primaryId, parentVersion], requireChanges: true },
       { sql: `DELETE FROM app_calendar__events WHERE recurring_event_id=?`, params: [primaryId] },
-    ]).catch(() => null);
+    ]).catch(writeFailed);
     if (applied === null) {
       localEvents = withPendingDrags(prevEvents);   // same reason as submitEdit
       render();
@@ -2687,7 +2724,7 @@ async function deleteEvent(primaryId, occDate, scope, parentVersion, overrideVer
         claimSeries(primary, now, parentVersion),
         updateEvent({ id: existing.id, version: overrideVersion, now,
           set: { is_cancelled: 1 } }),
-      ]);
+      ]).catch(writeFailed);
     } else {
       const exId = crypto.randomUUID();
       // A cancellation is still an override row, and it carries the series'
@@ -2701,7 +2738,7 @@ async function deleteEvent(primaryId, occDate, scope, parentVersion, overrideVer
         insertOverride({ id: exId, primary, occDate, actor: ME?.id ?? null, now, cancelled: true,
           values: { ...primary, start_date: occDate, end_date: occDate,
                     organizer_id: ME?.id ?? null, attendee_ids: "[]" } }),
-      ]);
+      ]).catch(writeFailed);
     }
   } else if (scope === "following") {
     const rule = JSON.parse(primary.recurrence ?? "{}");
@@ -2710,8 +2747,9 @@ async function deleteEvent(primaryId, occDate, scope, parentVersion, overrideVer
       updateEvent({ id: primaryId, version: parentVersion, now,
         set: { recurrence: JSON.stringify(rule) } }),
       { sql: `DELETE FROM app_calendar__events WHERE recurring_event_id=? AND original_date>=?`, params: [primaryId, occDate] },
-    ]);
+    ]).catch(writeFailed);
   }
+  if (applied === null) { closeModal(); render(); return; }
   await loadLocalEvents(); closeModal(); render();
   if (!applied) showWriteError("This event could not be deleted. It may have been changed or removed — the calendar has been refreshed.");
 }
@@ -2834,25 +2872,29 @@ function handleDeepLink() {
 }
 
 // ─── Init ─────────────────────────────────────────────────────────────────
-(async () => {
+async function start() {
   async function fetchMembers() {
     if (!CONTEXT) return;
-    try {
-      const res = await fetch(`${CONTEXT}?keys=family.members`);
-      members = ((await res.json())["family.members"]) ?? [];
-    } catch { members = []; }
+    const res = await fetch(`${CONTEXT}?keys=family.members`);
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data || typeof data !== "object" || data.error || (Array.isArray(data.$errors) && data.$errors.includes("family.members"))) throw new Error("Couldn’t reach the hub. Try again.");
+    members = data["family.members"] ?? [];
   }
   // Read-only members (everyone but the steward in a roster) never see the
   // "+ Event" control — writes would be rejected by the hub anyway.
   if (!canWrite) { const b = document.getElementById("new-event-btn"); if (b) b.style.display = "none"; }
   await Promise.all([
-    fetchMembers(),
-    (async () => { if (DB) { await initDb(); await loadLocalEvents(); } })(),
+    // A failed member read is a failed load too: nobody's name or colour is known.
+    fetchMembers().then(() => { rosterFailed = false; }, () => { rosterFailed = true; }),
+    // A failed read still draws the calendar, under a banner that offers a retry.
+    (async () => { if (DB) { await initDb(); await loadLocalEvents(); } })().catch(() => { loadFailed = true; }),
     loadSyncedEvents(),
   ]);
   render();
   handleDeepLink();
-})();
+}
+window.retryLoad = start;
+start();
 </script>
 </body>
 </html>
