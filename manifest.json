@@ -247,9 +247,6 @@
     },
     "display": { "template": "list", "title": "title", "when": "at" }
   },
-  "resource_limits": {
-    "max_db_bytes": 104857600
-  },
   "icon": "📅",
   "ai_access": {
     "allowed": true,
