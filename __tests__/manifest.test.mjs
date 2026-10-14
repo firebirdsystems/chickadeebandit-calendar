@@ -133,6 +133,18 @@ if (manifest.ai_access) {
           ).toBe(maxParam);
         }
       });
+
+      // The hub seals a value only when its placeholder is assigned DIRECTLY to
+      // the column; wrapped in a function (COALESCE($5, '')) it is stored as
+      // plain text. `description` is NOT NULL and bound directly, so the caller
+      // must send a string ("" for none): a null or omitted value would be
+      // refused by SQLite.
+      it("add_event binds description directly and requires it as a string", () => {
+        const schema = JSON.parse(readFileSync(join(__dirname, "../src/schemas/add_event.json"), "utf-8"));
+        expect(readFileSync(join(__dirname, "../src/inserts/add_event.sql"), "utf-8")).toMatch(/^\s*\$5,\s*$/m);
+        expect(schema.items[4].type).toBe("string");
+        expect(schema.minItems).toBeGreaterThanOrEqual(5);
+      });
     });
   }
 }

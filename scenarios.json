@@ -136,7 +136,7 @@
           "as": "parent",
           "kind": "insert",
           "name": "add_event",
-          "params": ["Dentist", "2026-10-01", "2026-10-01", "09:30", null, "{{other}}"],
+          "params": ["Dentist", "2026-10-01", "2026-10-01", "09:30", "", "{{other}}"],
           "expect": { "status": 200 }
         },
         {

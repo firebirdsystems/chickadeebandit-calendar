@@ -17,7 +17,7 @@ INSERT INTO app_calendar__events (
 ) VALUES (
   lower(hex(randomblob(16))),
   $1,
-  COALESCE($5, ''),
+  $5,
   '',
   $2,
   $4,
