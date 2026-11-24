@@ -150,6 +150,144 @@
           }
         }
       ]
+    },
+    {
+      "name": "in a co-parenting space a parent's private event stays private from the other parent: being a steward there shows nothing and changes nothing",
+      "context": "shared_space.coparenting",
+      "members": {
+        "mum": "admin",
+        "dad": "admin"
+      },
+      "steps": [
+        {
+          "action": "seedRaw",
+          "sql": "INSERT INTO app_calendar__events (id, title, start_date, end_date, created_by, visibility, created_at, updated_at) VALUES ('ev-shared', 'Parents evening', '2026-12-10', '2026-12-10', ?, 'everyone', '2026-11-01T00:00:00Z', '2026-11-01T00:00:00Z'), ('ev-priv', 'Solicitor', '2026-12-11', '2026-12-11', ?, 'private', '2026-11-01T00:00:00Z', '2026-11-01T00:00:00Z')",
+          "params": [
+            "{{mum}}",
+            "{{mum}}"
+          ]
+        },
+        {
+          "action": "db",
+          "as": "dad",
+          "sql": "SELECT id FROM app_calendar__events ORDER BY id",
+          "expect": {
+            "status": 200,
+            "rowCount": 1,
+            "rowsContain": [
+              {
+                "id": "ev-shared"
+              }
+            ]
+          }
+        },
+        {
+          "action": "db",
+          "as": "dad",
+          "sql": "UPDATE app_calendar__events SET title = ? WHERE id = ?",
+          "params": [
+            "Seen",
+            "ev-priv"
+          ],
+          "expect": {
+            "status": 200
+          }
+        },
+        {
+          "action": "db",
+          "as": "dad",
+          "sql": "DELETE FROM app_calendar__events WHERE id = ?",
+          "params": [
+            "ev-priv"
+          ],
+          "expect": {
+            "status": 200
+          }
+        },
+        {
+          "action": "db",
+          "as": "mum",
+          "sql": "SELECT id, title FROM app_calendar__events WHERE id = ?",
+          "params": [
+            "ev-priv"
+          ],
+          "expect": {
+            "status": 200,
+            "rowCount": 1,
+            "rowsContain": [
+              {
+                "id": "ev-priv",
+                "title": "Solicitor"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "in a co-parenting space an event one parent adds cannot be put in the other parent's name",
+      "context": "shared_space.coparenting",
+      "members": {
+        "mum": "admin",
+        "dad": "admin"
+      },
+      "steps": [
+        {
+          "action": "db",
+          "as": "dad",
+          "sql": "INSERT INTO app_calendar__events (id, title, start_date, end_date, created_by, visibility, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+          "params": [
+            "ev-forged",
+            "Cancelled the handover",
+            "2026-12-12",
+            "2026-12-12",
+            "{{mum}}",
+            "everyone",
+            "2026-11-02T00:00:00Z",
+            "2026-11-02T00:00:00Z"
+          ]
+        },
+        {
+          "action": "db",
+          "as": "mum",
+          "sql": "SELECT id FROM app_calendar__events WHERE created_by = ?",
+          "params": [
+            "{{mum}}"
+          ],
+          "expect": {
+            "status": 200,
+            "rowCount": 0
+          }
+        }
+      ]
+    },
+    {
+      "name": "in a co-parenting space a child the parents have not let in cannot open the shared calendar",
+      "context": "shared_space.coparenting",
+      "members": {
+        "mum": "admin",
+        "dad": "admin",
+        "kid": "child"
+      },
+      "steps": [
+        {
+          "action": "seedRaw",
+          "sql": "INSERT INTO app_calendar__events (id, title, start_date, end_date, created_by, visibility, created_at, updated_at) VALUES ('ev-shared', 'Parents evening', '2026-12-10', '2026-12-10', ?, 'everyone', '2026-11-01T00:00:00Z', '2026-11-01T00:00:00Z'), ('ev-priv', 'Solicitor', '2026-12-11', '2026-12-11', ?, 'private', '2026-11-01T00:00:00Z', '2026-11-01T00:00:00Z')",
+          "params": [
+            "{{mum}}",
+            "{{mum}}"
+          ]
+        },
+        {
+          "action": "db",
+          "as": "kid",
+          "sql": "SELECT id FROM app_calendar__events",
+          "expect": {
+            "status": 403,
+            "errorIncludes": "not available"
+          }
+        }
+      ]
     }
   ]
 }
